@@ -28,6 +28,24 @@ namespace Maliang.EditorTools
         const string BrushTexDir = "Assets/Maliang/Art/NodeBrush/Textures/BrushTextures";
         const string SealWu = "Assets/Maliang/Art/Seals/seal_wu.png";
         const string SealJing = "Assets/Maliang/Art/Seals/seal_jing.png";
+        const string SealObjectModel = "Assets/Maliang/Art/Seals/Models/SealObject_Tripo.glb";
+        const string SealWorldModel = "Assets/Maliang/Art/Seals/Models/SealWorld_Tripo.glb";
+        const float SealHeight = 0.095f;   // desk seal, base to top of the knob (m)
+        const float SealModelYaw = -90f;   // the carved logo is on the Tripo models' local -X side; turn it toward the player (-Z)
+        const string InkstoneModel = "Assets/Maliang/Art/Environment/Inkstone_Tripo.glb";
+        const float InkstoneLength = 0.16f;  // longest side of the Tripo inkstone that replaces the desk's round 古砚 (m)
+        const float InkstoneYaw = 0f;        // turn the Tripo model so its wells sit the way the reference shows
+        const string CandleStandModel = "Assets/Maliang/Art/Environment/CandleStand_Tripo.glb";
+        const float CandleStandHeight = 0.22f;  // lotus candle stand on the desk (m); becomes the Phase 4 candle
+        // Hand-placed in the editor (world metres, x/z on the desk top; the desk itself is fixed by DeskFrontZ/DeskYaw).
+        static readonly Vector2 PaintFirstDishXZ = new Vector2(0.7028f, 0.4822f);   // 墨, front-right dish of the grid
+        static readonly Vector2 InkstoneXZ = new Vector2(-0.4828f, 0.6460f);        // desk left, where the grey tray was
+        static readonly Vector2 CandleStandXZ = new Vector2(0.47f, 0.91f);         // desk right, behind the paints
+        static readonly Vector2 SealWorldXZ = new Vector2(-0.597f, 0.5089f);        // 境 on the left ...
+        static readonly Vector2 SealObjectXZ = new Vector2(-0.492f, 0.5089f);       // ... 物 on its right
+        const string LotusFloorModel = "Assets/Maliang/Art/Environment/LotusPlatform_Tripo.glb";
+        const float LotusTopDiameter = 4.5f;                      // walkable inner disc (m)
+        static readonly Vector3 LotusCenter = new Vector3(0f, 0f, 0.45f); // between the player and the desk
         const string StoneAlbedo = "Assets/Maliang/Art/Textures/stone_albedo.png";
         const string StoneNormal = "Assets/Maliang/Art/Textures/stone_normal.png";
 
@@ -38,6 +56,7 @@ namespace Maliang.EditorTools
             "1", "02", "Object01", "Object02", "Tube01", "Circle11", "Circle12",
             "Line1607", "Line1608", "Line1609", "Line1610", "Line1611", "Line1612",
             "Line01.002", "Line17", "Line1613",
+            "Box06", "红木砚托", // grey inkstone tray and rosewood inkstone stand, replaced by the Tripo inkstone
         };
 
         // Desk props the player can pick up (they glide back when released, like the brush).
@@ -46,9 +65,7 @@ namespace Maliang.EditorTools
         {
             ("Book 1", new[] { "B-16", "B-15" }),
             ("Book 2", new[] { "B-17", "B-18" }),
-            ("Inkstone Tray", new[] { "Box06" }),
             ("Inkstone 古砚", new[] { "古砚" }),
-            ("Inkstone Stand 红木砚托", new[] { "红木砚托" }),
         };
 
         // Layout (metres)
@@ -100,12 +117,8 @@ namespace Maliang.EditorTools
                 sun.shadows = LightShadows.Soft;
             }
 
-            // Floor
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            floor.name = "Floor";
-            floor.transform.localScale = new Vector3(1f, 1f, 1f);
-            floor.GetComponent<Renderer>().sharedMaterial = Lit("Floor", new Color(0.23f, 0.2f, 0.18f), 0.2f);
-            floor.isStatic = true;
+            // Floor: the Tripo lotus platform (falls back to a plain plane if the model is missing)
+            report.Add(BuildLotusFloor());
 
             // XR rig
             var rig = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(XrOriginPrefab));
@@ -138,23 +151,26 @@ namespace Maliang.EditorTools
 
             float surfaceY = deskTop.max.y;
             float rightX = deskTop.center.x + ScrollSize.x * 0.5f;
-            float leftX = deskTop.center.x - ScrollSize.x * 0.5f;
 
             // Paints: two rows of five at the front right, between the scroll roller and the desk edge
             var stone = StoneMaterial();
             for (int i = 0; i < Paints.Length; i++)
             {
                 int col = i % PaintColumns, row = i / PaintColumns;
-                var p = new Vector3(deskTop.max.x - 0.07f - col * DishSpacing, surfaceY, deskTop.min.z + 0.06f + row * DishSpacing);
+                var p = new Vector3(PaintFirstDishXZ.x - col * DishSpacing, surfaceY, PaintFirstDishXZ.y + row * DishSpacing);
                 BuildInkPot(Paints[i].name, Paints[i].color, p, stone);
             }
 
             // Brush, standing upright behind the paints, clear of the scroll roller and the inkstone
-            var pen = BuildBrush(canvas, new Vector3(rightX + 0.09f, surfaceY + 0.03f, deskTop.min.z + 0.06f + 2.4f * DishSpacing));
+            var pen = BuildBrush(canvas, new Vector3(rightX + 0.055f, surfaceY + 0.03f, deskTop.min.z + 0.06f + 2.2f * DishSpacing));
 
-            // Seals side by side at the front left (the grey inkstone tray sits behind them)
-            BuildSeal("Seal 物 (Object)", SealType.Object, SealWu, canvas, ritual, new Vector3(leftX - 0.26f, surfaceY, deskTop.min.z + 0.08f));
-            BuildSeal("Seal 境 (World)", SealType.World, SealJing, canvas, ritual, new Vector3(leftX - 0.14f, surfaceY, deskTop.min.z + 0.08f));
+            // Tripo inkstone in place of the desk model's round 古砚 (desk left), lotus candle stand at the back right
+            report.Add(BuildInkstone(surfaceY));
+            report.Add(BuildCandleStand(surfaceY));
+
+            // Seals side by side at the front left, in front of the inkstone
+            BuildSeal("Seal 物 (Object)", SealType.Object, SealWu, SealObjectModel, canvas, ritual, new Vector3(SealObjectXZ.x, surfaceY, SealObjectXZ.y));
+            BuildSeal("Seal 境 (World)", SealType.World, SealJing, SealWorldModel, canvas, ritual, new Vector3(SealWorldXZ.x, surfaceY, SealWorldXZ.y));
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.55f, 0.55f, 0.6f);
@@ -165,6 +181,132 @@ namespace Maliang.EditorTools
             AddToBuildSettings(ScenePath);
             report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, scroll at {scrollRoot.transform.position}, pen at {pen.transform.position}");
             return string.Join("\n", report);
+        }
+
+        // ------------------------------------------------------------------ candle stand
+
+        /// <summary>
+        /// The Tripo lotus candle stand, scaled to <see cref="CandleStandHeight"/> and stood on the desk at
+        /// <see cref="CandleStandXZ"/>, its lowest point resting on the desk top. Grabbable with return-to-rest like the other desk props
+        /// (Phase 4 turns it into the candle).
+        /// </summary>
+        static string BuildCandleStand(float surfaceY)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(CandleStandModel);
+            if (prefab == null) return "Candle stand skipped (model missing)";
+
+            var root = new GameObject("Prop Candle Stand 烛台");
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            model.name = "Model";
+            model.transform.SetParent(root.transform, false);
+
+            var b = RendererBounds(model);
+            model.transform.localScale = Vector3.one * (CandleStandHeight / b.size.y);
+            b = RendererBounds(model);
+            model.transform.position -= new Vector3(b.center.x, b.min.y, b.center.z); // base centred on the root
+            b = RendererBounds(model);
+
+            root.transform.position = new Vector3(CandleStandXZ.x, surfaceY, CandleStandXZ.y);
+
+            // Box collider: the model is too detailed for a convex hull (Unity caps hulls at 256 polygons).
+            var col = root.AddComponent<BoxCollider>();
+            col.center = root.transform.InverseTransformPoint(RendererBounds(model).center);
+            col.size = b.size;
+            ConfigureGrab(root);
+            root.AddComponent<GrabbableTool>();
+            return $"Candle stand at {root.transform.position}, size {b.size}";
+        }
+
+        // ------------------------------------------------------------------ inkstone
+
+        /// <summary>
+        /// Swaps the desk model's round 古砚 for the Tripo inkstone: the old mesh is removed from its grabbable prop and
+        /// the Tripo model (longest side <see cref="InkstoneLength"/>) goes in, stood on the desk at <see cref="InkstoneXZ"/>.
+        /// The prop keeps its grab / return-to-rest setup.
+        /// </summary>
+        static string BuildInkstone(float surfaceY)
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(InkstoneModel);
+            var root = GameObject.Find("Prop Inkstone 古砚");
+            if (prefab == null || root == null) return "Inkstone swap skipped (model or 古砚 missing)";
+
+            foreach (Transform child in root.transform.Cast<Transform>().ToList()) Object.DestroyImmediate(child.gameObject);
+
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            model.name = "Model";
+            model.transform.SetParent(root.transform, false);
+            model.transform.localRotation = Quaternion.Euler(0f, InkstoneYaw, 0f);
+            var b = RendererBounds(model);
+            model.transform.localScale = Vector3.one * (InkstoneLength / Mathf.Max(b.size.x, b.size.z));
+            b = RendererBounds(model);
+            model.transform.position -= new Vector3(b.center.x - root.transform.position.x, b.min.y - root.transform.position.y, b.center.z - root.transform.position.z);
+            b = RendererBounds(model);
+
+            root.transform.position = new Vector3(InkstoneXZ.x, surfaceY, InkstoneXZ.y);
+
+            // A box fits the slab well and stays cheap (a convex hull of the dense Tripo mesh hits Unity's 256-polygon cap).
+            var col = root.AddComponent<BoxCollider>();
+            b = RendererBounds(model);
+            col.center = root.transform.InverseTransformPoint(b.center);
+            col.size = b.size;
+            return $"Inkstone (Tripo) at {root.transform.position}, size {b.size}";
+        }
+
+        // ------------------------------------------------------------------ floor
+
+        /// <summary>
+        /// Stands the player on the lotus platform: the model is scaled so its flat top disc is
+        /// <see cref="LotusTopDiameter"/> across, and moved so that disc is at y = 0 (the XR rig's floor) centred on
+        /// <see cref="LotusCenter"/>. Mesh colliders make the top walkable / teleportable.
+        /// </summary>
+        static string BuildLotusFloor()
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(LotusFloorModel);
+            if (prefab == null)
+            {
+                var plane = GameObject.CreatePrimitive(PrimitiveType.Plane);
+                plane.name = "Floor";
+                plane.GetComponent<Renderer>().sharedMaterial = Lit("Floor", new Color(0.23f, 0.2f, 0.18f), 0.2f);
+                plane.isStatic = true;
+                return "Lotus floor model missing; used a plane";
+            }
+
+            var floor = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
+            floor.name = "Floor (Lotus Platform)";
+            foreach (var mf in floor.GetComponentsInChildren<MeshFilter>())
+                mf.gameObject.AddComponent<MeshCollider>().sharedMesh = mf.sharedMesh;
+
+            // Measure at the model's own scale: top height at the centre, then walk outwards until the surface
+            // stops being flat (the rim / petals) to get the radius of the walkable disc.
+            var b = RendererBounds(floor);
+            Physics.SyncTransforms();
+            float TopAt(Vector3 xz) => Physics.Raycast(new Vector3(xz.x, b.max.y + 1f, xz.z), Vector3.down, out var hit, b.size.y + 2f) ? hit.point.y : float.NaN;
+            float centreY = TopAt(b.center);
+            float radius = 0f;
+            float step = b.extents.x / 200f;
+            for (float r = step; r < b.extents.x; r += step)
+            {
+                bool flat = true;
+                for (int a = 0; a < 8 && flat; a++)
+                {
+                    float ang = a * Mathf.PI / 4f;
+                    float y = TopAt(b.center + new Vector3(Mathf.Cos(ang), 0f, Mathf.Sin(ang)) * r);
+                    flat = !float.IsNaN(y) && Mathf.Abs(y - centreY) < b.size.y * 0.02f;
+                }
+                if (!flat) break;
+                radius = r;
+            }
+            if (radius <= 0f) radius = b.extents.x * 0.8f;
+
+            float scale = LotusTopDiameter * 0.5f / radius;
+            floor.transform.localScale = Vector3.one * scale;
+            Vector3 centreTop = new Vector3(b.center.x, centreY, b.center.z) * scale;
+            floor.transform.position = LotusCenter - centreTop;
+            foreach (var t in floor.GetComponentsInChildren<Transform>()) t.gameObject.isStatic = true;
+            Physics.SyncTransforms();
+
+            var nb = RendererBounds(floor);
+            return $"Lotus floor: flat top radius {radius:F3} (model units) → scale {scale:F2}; size {nb.size}, top at y=0, base at y={nb.min.y:F2}";
         }
 
         // ------------------------------------------------------------------ desk
@@ -382,39 +524,29 @@ namespace Maliang.EditorTools
 
         // ------------------------------------------------------------------ seals
 
-        static void BuildSeal(string name, SealType type, string texPath, InkCanvas canvas, ScrollRitual ritual, Vector3 deskPoint)
+        /// <summary>
+        /// A desk seal using the Tripo-generated model (bronze 造物印 / jade 創世印). The model is scaled to
+        /// <see cref="SealHeight"/>, stood on the root's origin, and its flat base footprint becomes the stamping face.
+        /// </summary>
+        static void BuildSeal(string name, SealType type, string texPath, string modelPath, InkCanvas canvas, ScrollRitual ritual, Vector3 deskPoint)
         {
-            const float w = 0.045f, h = 0.07f;
             var root = new GameObject(name);
             root.transform.position = deskPoint + Vector3.up * 0.0005f;
 
-            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            body.name = "Body";
-            Object.DestroyImmediate(body.GetComponent<Collider>());
-            body.transform.SetParent(root.transform, false);
-            body.transform.localPosition = new Vector3(0f, h * 0.5f, 0f);
-            body.transform.localScale = new Vector3(w, h, w);
-            body.GetComponent<Renderer>().sharedMaterial = type == SealType.Object
-                ? Lit("SealStone Object", new Color(0.72f, 0.62f, 0.45f), 0.6f)
-                : Lit("SealStone World", new Color(0.35f, 0.55f, 0.48f), 0.7f);
+            var model = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(modelPath));
+            model.name = "Model";
+            model.transform.SetParent(root.transform, false);
+            model.transform.localRotation = Quaternion.Euler(0f, SealModelYaw, 0f);
 
-            var knob = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-            knob.name = "Knob";
-            Object.DestroyImmediate(knob.GetComponent<Collider>());
-            knob.transform.SetParent(root.transform, false);
-            knob.transform.localPosition = new Vector3(0f, h + 0.008f, 0f);
-            knob.transform.localScale = new Vector3(0.03f, 0.02f, 0.03f);
-            knob.GetComponent<Renderer>().sharedMaterial = body.GetComponent<Renderer>().sharedMaterial;
+            // Scale to desk size, then stand the base on the root origin, centred.
+            var b = RendererBounds(model);
+            model.transform.localScale = Vector3.one * (SealHeight / b.size.y);
+            b = RendererBounds(model);
+            model.transform.position += new Vector3(root.transform.position.x - b.center.x, root.transform.position.y - b.min.y, root.transform.position.z - b.center.z);
+            b = RendererBounds(model);
 
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
-            // Label on the side facing the player so the two seals can be told apart on the desk.
-            var label = GameObject.CreatePrimitive(PrimitiveType.Quad);
-            label.name = "Label";
-            Object.DestroyImmediate(label.GetComponent<Collider>());
-            label.transform.SetParent(root.transform, false);
-            label.transform.localPosition = new Vector3(0f, h * 0.55f, -w * 0.5f - 0.0005f);
-            label.transform.localScale = new Vector3(w * 0.8f, w * 0.8f, 1f);
-            label.GetComponent<Renderer>().sharedMaterial = Unlit("SealLabel " + type, tex);
+            // Stamping face = the flat base: vertices within 3 mm of the bottom.
+            Vector2 footprint = BaseFootprint(model, b.min.y + 0.003f);
 
             var face = new GameObject("Face");
             face.transform.SetParent(root.transform, false);
@@ -422,18 +554,45 @@ namespace Maliang.EditorTools
             face.transform.localRotation = Quaternion.Euler(180f, 0f, 0f); // +Y out of the face, i.e. down
 
             var col = root.AddComponent<BoxCollider>();
-            col.center = new Vector3(0f, h * 0.5f + 0.005f, 0f);
-            col.size = new Vector3(w, h + 0.01f, w);
+            col.center = root.transform.InverseTransformPoint(b.center);
+            col.size = b.size;
 
             ConfigureGrab(root);
 
             var seal = root.AddComponent<SealStamp>();
             seal.type = type;
-            seal.sealTexture = tex;
+            seal.sealTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
             seal.face = face.transform;
-            seal.faceSize = new Vector2(w, w);
+            // Square imprint texture: use the smaller side so the print never overhangs the base.
+            float side = Mathf.Min(footprint.x, footprint.y);
+            seal.faceSize = new Vector2(side, side);
             seal.canvas = canvas;
             seal.ritual = ritual;
+        }
+
+        static Bounds RendererBounds(GameObject go)
+        {
+            var rs = go.GetComponentsInChildren<Renderer>();
+            var b = rs[0].bounds;
+            foreach (var r in rs) b.Encapsulate(r.bounds);
+            return b;
+        }
+
+        /// <summary>World-space X/Z extent of the mesh vertices below <paramref name="maxY"/>.</summary>
+        static Vector2 BaseFootprint(GameObject go, float maxY)
+        {
+            float minX = float.MaxValue, maxX = float.MinValue, minZ = float.MaxValue, maxZ = float.MinValue;
+            foreach (var mf in go.GetComponentsInChildren<MeshFilter>())
+            {
+                foreach (var v in mf.sharedMesh.vertices)
+                {
+                    var w = mf.transform.TransformPoint(v);
+                    if (w.y > maxY) continue;
+                    minX = Mathf.Min(minX, w.x); maxX = Mathf.Max(maxX, w.x);
+                    minZ = Mathf.Min(minZ, w.z); maxZ = Mathf.Max(maxZ, w.z);
+                }
+            }
+            return minX > maxX ? Vector2.zero : new Vector2(maxX - minX, maxZ - minZ);
         }
 
         // ------------------------------------------------------------------ helpers
@@ -461,28 +620,6 @@ namespace Maliang.EditorTools
             }
             mat.SetColor("_BaseColor", color);
             mat.SetFloat("_Smoothness", smoothness);
-            EditorUtility.SetDirty(mat);
-            return mat;
-        }
-
-        static Material Unlit(string name, Texture tex)
-        {
-            string path = $"{MatDir}/{Sanitize(name)}.mat";
-            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (mat == null)
-            {
-                mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
-                AssetDatabase.CreateAsset(mat, path);
-            }
-            mat.SetTexture("_BaseMap", tex);
-            mat.SetFloat("_Surface", 1f); // transparent
-            mat.SetFloat("_Blend", 0f);
-            mat.SetOverrideTag("RenderType", "Transparent");
-            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-            mat.SetInt("_ZWrite", 0);
-            mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
             EditorUtility.SetDirty(mat);
             return mat;
         }
