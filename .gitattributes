@@ -1,0 +1,174 @@
+# Scoped to the Unity project at TripoHack-Maliang/My project/ (macros must live here, at the repo root).
+# ReferenceProject/ is intentionally left out: its binaries are already tracked as regular blobs.
+
+# Unity .gitattributes Template
+# Source: https://github.com/gitattributes/gitattributes/blob/master/Unity.gitattributes
+# Last synced: 2026-02-04
+# License: MIT
+#
+# This template is maintained from the gitattributes/gitattributes repository
+# and distributed under MIT License.
+
+# Define macros (only works in top-level gitattributes files)
+[attr]lfs               filter=lfs diff=lfs merge=lfs -text
+[attr]unity-json        eol=lf linguist-language=json
+[attr]unity-yaml        merge=unityyamlmerge eol=lf linguist-language=yaml
+
+# Optionally collapse Unity YAML files on GitHub diffs
+# [attr]unity-yaml        merge=unityyamlmerge text linguist-language=yaml linguist-generated
+
+# Unity source files
+"TripoHack-Maliang/My project/**/*.cginc" text
+"TripoHack-Maliang/My project/**/*.compute" text linguist-language=hlsl
+"TripoHack-Maliang/My project/**/*.cs" text diff=csharp
+"TripoHack-Maliang/My project/**/*.hlsl" text linguist-language=hlsl
+"TripoHack-Maliang/My project/**/*.raytrace" text linguist-language=hlsl
+"TripoHack-Maliang/My project/**/*.shader" text
+
+# Unity JSON files
+"TripoHack-Maliang/My project/**/*.asmdef" unity-json
+"TripoHack-Maliang/My project/**/*.asmref" unity-json
+"TripoHack-Maliang/My project/**/*.index" unity-json
+"TripoHack-Maliang/My project/**/*.inputactions" unity-json
+"TripoHack-Maliang/My project/**/*.shadergraph" unity-json
+"TripoHack-Maliang/My project/**/*.shadersubgraph" unity-json
+
+# Unity UI Toolkit files
+"TripoHack-Maliang/My project/**/*.tss" text diff=css linguist-language=css
+"TripoHack-Maliang/My project/**/*.uss" text diff=css linguist-language=css
+"TripoHack-Maliang/My project/**/*.uxml" text linguist-language=xml linguist-detectable
+
+# Unity YAML files
+"TripoHack-Maliang/My project/**/*.anim" unity-yaml
+"TripoHack-Maliang/My project/**/*.asset" unity-yaml
+"TripoHack-Maliang/My project/**/*.brush" unity-yaml
+"TripoHack-Maliang/My project/**/*.controller" unity-yaml
+"TripoHack-Maliang/My project/**/*.flare" unity-yaml
+"TripoHack-Maliang/My project/**/*.fontsettings" unity-yaml
+"TripoHack-Maliang/My project/**/*.giparams" unity-yaml
+"TripoHack-Maliang/My project/**/*.guiskin" unity-yaml
+"TripoHack-Maliang/My project/**/*.lighting" unity-yaml
+"TripoHack-Maliang/My project/**/*.mask" unity-yaml
+"TripoHack-Maliang/My project/**/*.mat" unity-yaml
+"TripoHack-Maliang/My project/**/*.meta" unity-yaml
+"TripoHack-Maliang/My project/**/*.mixer" unity-yaml
+"TripoHack-Maliang/My project/**/*.overrideController" unity-yaml
+"TripoHack-Maliang/My project/**/*.playable" unity-yaml
+"TripoHack-Maliang/My project/**/*.prefab" unity-yaml
+"TripoHack-Maliang/My project/**/*.preset" unity-yaml
+"TripoHack-Maliang/My project/**/*.renderTexture" unity-yaml
+"TripoHack-Maliang/My project/**/*.scenetemplate" unity-yaml
+"TripoHack-Maliang/My project/**/*.shadervariants" unity-yaml
+"TripoHack-Maliang/My project/**/*.signal" unity-yaml
+"TripoHack-Maliang/My project/**/*.spriteatlas" unity-yaml
+"TripoHack-Maliang/My project/**/*.spriteatlasv2" unity-yaml
+"TripoHack-Maliang/My project/**/*.terrainlayer" unity-yaml
+"TripoHack-Maliang/My project/**/*.unity" unity-yaml
+
+# "physic" for 3D but "physics" for 2D
+"TripoHack-Maliang/My project/**/*.physicMaterial" unity-yaml
+"TripoHack-Maliang/My project/**/*.physicsMaterial2D" unity-yaml
+
+# Exclude from GitHub stats and diffs: third-party plugins, packages lock file
+"TripoHack-Maliang/My project/Assets/Plugins/**" linguist-generated
+"TripoHack-Maliang/My project/Packages/packages-lock.json" linguist-generated
+
+# Unity LFS
+"TripoHack-Maliang/My project/**/*.cubemap" lfs
+"TripoHack-Maliang/My project/**/*.unitypackage" lfs
+
+# 3D models
+"TripoHack-Maliang/My project/**/*.3dm" lfs
+"TripoHack-Maliang/My project/**/*.3ds" lfs
+"TripoHack-Maliang/My project/**/*.blend" lfs
+"TripoHack-Maliang/My project/**/*.blend1" lfs
+"TripoHack-Maliang/My project/**/*.c4d" lfs
+"TripoHack-Maliang/My project/**/*.collada" lfs
+"TripoHack-Maliang/My project/**/*.dae" lfs
+"TripoHack-Maliang/My project/**/*.dxf" lfs
+"TripoHack-Maliang/My project/**/*.FBX" lfs
+"TripoHack-Maliang/My project/**/*.fbx" lfs
+"TripoHack-Maliang/My project/**/*.jas" lfs
+"TripoHack-Maliang/My project/**/*.lws" lfs
+"TripoHack-Maliang/My project/**/*.lxo" lfs
+"TripoHack-Maliang/My project/**/*.ma" lfs
+"TripoHack-Maliang/My project/**/*.max" lfs
+"TripoHack-Maliang/My project/**/*.mb" lfs
+"TripoHack-Maliang/My project/**/*.obj" lfs
+"TripoHack-Maliang/My project/**/*.ply" lfs
+"TripoHack-Maliang/My project/**/*.skp" lfs
+"TripoHack-Maliang/My project/**/*.stl" lfs
+"TripoHack-Maliang/My project/**/*.ztl" lfs
+
+# Audio
+"TripoHack-Maliang/My project/**/*.aif" lfs
+"TripoHack-Maliang/My project/**/*.aiff" lfs
+"TripoHack-Maliang/My project/**/*.it" lfs
+"TripoHack-Maliang/My project/**/*.mod" lfs
+"TripoHack-Maliang/My project/**/*.mp3" lfs
+"TripoHack-Maliang/My project/**/*.ogg" lfs
+"TripoHack-Maliang/My project/**/*.s3m" lfs
+"TripoHack-Maliang/My project/**/*.wav" lfs
+"TripoHack-Maliang/My project/**/*.xm" lfs
+
+# Video
+"TripoHack-Maliang/My project/**/*.asf" lfs
+"TripoHack-Maliang/My project/**/*.avi" lfs
+"TripoHack-Maliang/My project/**/*.flv" lfs
+"TripoHack-Maliang/My project/**/*.mov" lfs
+"TripoHack-Maliang/My project/**/*.mp4" lfs
+"TripoHack-Maliang/My project/**/*.mpeg" lfs
+"TripoHack-Maliang/My project/**/*.mpg" lfs
+"TripoHack-Maliang/My project/**/*.ogv" lfs
+"TripoHack-Maliang/My project/**/*.wmv" lfs
+
+# Images
+"TripoHack-Maliang/My project/**/*.bmp" lfs
+"TripoHack-Maliang/My project/**/*.exr" lfs
+"TripoHack-Maliang/My project/**/*.gif" lfs
+"TripoHack-Maliang/My project/**/*.hdr" lfs
+"TripoHack-Maliang/My project/**/*.iff" lfs
+"TripoHack-Maliang/My project/**/*.jpeg" lfs
+"TripoHack-Maliang/My project/**/*.jpg" lfs
+"TripoHack-Maliang/My project/**/*.pict" lfs
+"TripoHack-Maliang/My project/**/*.png" lfs
+"TripoHack-Maliang/My project/**/*.psd" lfs
+"TripoHack-Maliang/My project/**/*.tga" lfs
+"TripoHack-Maliang/My project/**/*.tif" lfs
+"TripoHack-Maliang/My project/**/*.tiff" lfs
+"TripoHack-Maliang/My project/**/*.webp" lfs
+
+# Compressed Archive
+"TripoHack-Maliang/My project/**/*.7z" lfs
+"TripoHack-Maliang/My project/**/*.bz2" lfs
+"TripoHack-Maliang/My project/**/*.gz" lfs
+"TripoHack-Maliang/My project/**/*.rar" lfs
+"TripoHack-Maliang/My project/**/*.tar" lfs
+"TripoHack-Maliang/My project/**/*.zip" lfs
+
+# Compiled Dynamic Library
+"TripoHack-Maliang/My project/**/*.dll" lfs
+"TripoHack-Maliang/My project/**/*.pdb" lfs
+"TripoHack-Maliang/My project/**/*.so" lfs
+
+# Fonts
+"TripoHack-Maliang/My project/**/*.otf" lfs
+"TripoHack-Maliang/My project/**/*.ttf" lfs
+
+# Executable/Installer
+"TripoHack-Maliang/My project/**/*.apk" lfs
+"TripoHack-Maliang/My project/**/*.exe" lfs
+
+# Documents
+"TripoHack-Maliang/My project/**/*.pdf" lfs
+
+# ETC
+"TripoHack-Maliang/My project/**/*.a" lfs
+"TripoHack-Maliang/My project/**/*.reason" lfs
+"TripoHack-Maliang/My project/**/*.rns" lfs
+
+# Spine export file for Unity
+"TripoHack-Maliang/My project/**/*.skel.bytes" lfs
+
+# Exceptions for .asset files such as lightning pre-baking
+"TripoHack-Maliang/My project/**/LightingData.asset" binary
