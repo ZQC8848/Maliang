@@ -11,7 +11,11 @@ namespace Maliang.Ritual
     /// </summary>
     public class DeskDebugKeys : MonoBehaviour
     {
+        [Tooltip("Resets / exports the station's active scroll (and clears away earlier ones). Without it, the ritual below.")]
+        public ScrollStation station;
         public ScrollRitual ritual;
+
+        ScrollRitual Active => station != null && station.Active != null ? station.Active : ritual;
 
         InputAction _reset;
 
@@ -27,15 +31,19 @@ namespace Maliang.Ritual
 
         void Update()
         {
-            if (ritual == null) return;
-            if (_reset.WasPressedThisFrame()) ritual.ResetScroll();
+            if (Active == null) return;
+            if (_reset.WasPressedThisFrame())
+            {
+                if (station != null) station.ResetAll();
+                else ritual.ResetScroll();
+            }
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) ExportToTestData();
         }
 
         [ContextMenu("Export Ink To TestData")]
         public void ExportToTestData()
         {
-            ritual.canvas.Export(result =>
+            Active.canvas.Export(result =>
             {
                 if (result.Empty) return;
                 string dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "TestData", "Exports"));

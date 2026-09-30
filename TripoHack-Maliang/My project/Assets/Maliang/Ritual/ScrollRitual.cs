@@ -19,9 +19,20 @@ namespace Maliang.Ritual
         Failed,
     }
 
+    public enum ScrollStartMode
+    {
+        /// <summary>Starts rolled up in the middle of the desk and unrolls after a short pause.</summary>
+        UnrollOnStart,
+        /// <summary>Stays rolled up (a spare scroll waiting to be laid on the desk).</summary>
+        Rolled,
+        /// <summary>Starts flat and open.</summary>
+        Open,
+    }
+
     /// <summary>
-    /// The scroll's state machine (TechPlan §6.1). Phase 2 covers Unrolled → Levitating:
-    /// the seal is the "final" stroke — once it lands the drawing locks and the scroll rises to hover in front of the player.
+    /// The scroll's state machine (TechPlan §6.1): Rolled → Unrolled → Levitating.
+    /// The scroll starts rolled up and unrolls on the desk (<see cref="ScrollUnroll"/>); the seal is the "final" stroke —
+    /// once it lands the drawing locks and the scroll rises to hover in front of the player.
     /// </summary>
     public class ScrollRitual : MonoBehaviour
     {
@@ -30,6 +41,13 @@ namespace Maliang.Ritual
         public Transform scrollRoot;
         [Tooltip("Player head. Defaults to Camera.main.")]
         public Transform head;
+
+        [Header("Unrolling")]
+        [Tooltip("Rod / paper animation. Without it the scroll starts open.")]
+        public ScrollUnroll unroll;
+        public ScrollStartMode startMode = ScrollStartMode.UnrollOnStart;
+        [Tooltip("Pause before the scroll unrolls at the start (s).")]
+        public float unrollDelay = 1f;
 
         [Header("Seal rules")]
         [Tooltip("Minimum inked fraction of the canvas before a seal is accepted (TechPlan §5.5).")]
@@ -53,6 +71,7 @@ namespace Maliang.Ritual
         /// <summary>True once the rise animation has finished and the scroll is hovering.</summary>
         public bool IsHovering { get; private set; }
 
+        public event Action Unrolled;
         public event Action<SealType> Sealed;
         public event Action Hovering;
 
@@ -61,16 +80,64 @@ namespace Maliang.Ritual
         Vector3 _hoverPos;
         float _hoverTime;
         Coroutine _rise;
+        Coroutine _unrolling;
 
         Transform Root => scrollRoot != null ? scrollRoot : canvas.transform;
         Transform Head => head != null ? head : (Camera.main != null ? Camera.main.transform : null);
 
         public bool CanSeal => State == ScrollState.Unrolled && canvas.InkCoverage >= minInkCoverage;
+        /// <summary>True once the scroll has left the desk: hovering after its seal, or further on in the ritual.</summary>
+        public bool OffDesk => State >= ScrollState.Burning || (State == ScrollState.Levitating && IsHovering);
 
         void Awake()
         {
             _deskPos = Root.position;
             _deskRot = Root.rotation;
+        }
+
+        void Start()
+        {
+            if (unroll == null) return;
+            if (startMode == ScrollStartMode.UnrollOnStart) RollUpAndUnroll(unrollDelay);
+            else if (startMode == ScrollStartMode.Rolled)
+            {
+                State = ScrollState.Rolled;
+                canvas.InputLocked = true;
+                unroll.SetProgress(0f);
+            }
+        }
+
+        /// <summary>Where the scroll lies while it is drawn on (and returns to on reset).</summary>
+        public void SetDeskPose(Vector3 position, Quaternion rotation)
+        {
+            _deskPos = position;
+            _deskRot = rotation;
+        }
+
+        /// <summary>
+        /// Rolls the scroll up (animated, or snapped when <paramref name="animateRollUp"/> is false), locks the drawing,
+        /// and unrolls it again after <paramref name="delay"/> seconds.
+        /// </summary>
+        public void RollUpAndUnroll(float delay, bool animateRollUp = false)
+        {
+            if (unroll == null) return;
+            if (_unrolling != null) StopCoroutine(_unrolling);
+            State = ScrollState.Rolled;
+            canvas.InputLocked = true;
+            if (!animateRollUp) unroll.SetProgress(0f);
+            _unrolling = StartCoroutine(UnrollRoutine(delay));
+        }
+
+        IEnumerator UnrollRoutine(float delay)
+        {
+            if (unroll.Progress > 0f) yield return unroll.Play(0f);
+            if (delay > 0f) yield return new WaitForSeconds(delay);
+            yield return unroll.Play(1f);
+            _unrolling = null;
+            State = ScrollState.Unrolled;
+            canvas.InputLocked = false;
+            MaliangLog.Info("Ritual", "Scroll unrolled.");
+            Unrolled?.Invoke();
         }
 
         /// <summary>Called by a seal after it printed. Locks the drawing and starts the rise.</summary>
@@ -140,6 +207,7 @@ namespace Maliang.Ritual
             IsHovering = false;
             State = ScrollState.Unrolled;
             MaliangLog.Info("Ritual", "Scroll reset.");
+            RollUpAndUnroll(0.3f, animateRollUp: true); // roll up, then a fresh sheet unrolls again
         }
     }
 }

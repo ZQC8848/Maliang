@@ -1,5 +1,6 @@
 // Scroll surface: paper × ink (multiply), then the seal layer on top (premultiplied alpha).
 // Double-sided so the scroll reads from either side once it levitates.
+// _RevealHalf clips the paper to |u - 0.5| <= _RevealHalf: the strip between the rollers while the scroll unrolls.
 Shader "Maliang/ScrollDisplay"
 {
     Properties
@@ -8,6 +9,7 @@ Shader "Maliang/ScrollDisplay"
         _PaperTint ("Paper Tint", Color) = (0.96, 0.92, 0.84, 1)
         _InkTex ("Ink (RT)", 2D) = "white" {}
         _SealTex ("Seal (RT)", 2D) = "black" {}
+        _RevealHalf ("Reveal Half Width (UV)", Range(0, 0.5)) = 0.5
     }
     SubShader
     {
@@ -30,6 +32,7 @@ Shader "Maliang/ScrollDisplay"
             CBUFFER_START(UnityPerMaterial)
                 float4 _PaperTex_ST;
                 half4 _PaperTint;
+                float _RevealHalf;
             CBUFFER_END
 
             struct Attributes
@@ -58,6 +61,7 @@ Shader "Maliang/ScrollDisplay"
 
             half4 frag(Varyings i) : SV_Target
             {
+                clip(_RevealHalf - abs(i.uv.x - 0.5));
                 half3 paper = SAMPLE_TEXTURE2D(_PaperTex, sampler_PaperTex, i.uv * _PaperTex_ST.xy + _PaperTex_ST.zw).rgb * _PaperTint.rgb;
                 half3 ink = SAMPLE_TEXTURE2D(_InkTex, sampler_InkTex, i.uv).rgb;
                 half4 seal = SAMPLE_TEXTURE2D(_SealTex, sampler_SealTex, i.uv);

@@ -1,3 +1,4 @@
+using Maliang.Ritual;
 using Maliang.VR;
 using UnityEngine;
 
@@ -10,6 +11,8 @@ namespace Maliang.Drawing
     /// </summary>
     public class BrushPen : GrabbableTool
     {
+        [Tooltip("Paints on this station's active scroll. Without a station, on the canvas below.")]
+        public ScrollStation station;
         public InkCanvas canvas;
         [Tooltip("Tip of the brush. Painting uses its position.")]
         public Transform nib;
@@ -52,18 +55,20 @@ namespace Maliang.Drawing
         public float minBendTravel = 0.0005f;
 
         BrushStroke _stroke;
+        InkCanvas _strokeCanvas;
         MaterialPropertyBlock _mpb;
         Vector3 _lastBonePos, _boneDir;
         float _boneTimer;
 
         public bool IsDrawing => _stroke != null && _stroke.Active;
+        /// <summary>The canvas being painted on: the station's active scroll, else <see cref="canvas"/>.</summary>
+        public InkCanvas Canvas => station != null && station.Active != null ? station.Active.canvas : canvas;
         public Texture CurrentStyle => styles != null && styles.Length > 0 ? styles[Mathf.Clamp(styleIndex, 0, styles.Length - 1)] : null;
 
         protected override void Awake()
         {
             base.Awake();
             _mpb = new MaterialPropertyBlock();
-            if (canvas != null) _stroke = new BrushStroke(canvas);
             SetInk(inkColor);
         }
 
@@ -81,10 +86,18 @@ namespace Maliang.Drawing
 
         void Update()
         {
+            var target = Canvas;
+            if (target != _strokeCanvas)
+            {
+                // A new scroll was laid on the desk: finish on the old one, paint on the new one.
+                _stroke?.End();
+                _stroke = target != null ? new BrushStroke(target) : null;
+                _strokeCanvas = target;
+            }
             if (_stroke == null || nib == null) return;
-            if (!IsHeld || canvas.InputLocked) { _stroke.End(); return; }
+            if (!IsHeld || target.InputLocked) { _stroke.End(); return; }
 
-            if (canvas.TryProject(nib.position, out var uv, out float height) &&
+            if (target.TryProject(nib.position, out var uv, out float height) &&
                 height <= contactHeight && height >= -maxPenetration)
             {
                 float depth = Mathf.Max(0f, -height);
@@ -95,7 +108,7 @@ namespace Maliang.Drawing
                 _stroke.Brush = CurrentStyle;
                 _stroke.Color = inkColor;
                 _stroke.SizeMultiplier = sizeMultiplier;
-                _stroke.AddPoint(canvas.UvToPixel(uv), pressure);
+                _stroke.AddPoint(target.UvToPixel(uv), pressure);
             }
             else
             {

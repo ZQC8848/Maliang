@@ -49,6 +49,9 @@ namespace Maliang.EditorTools
         static readonly Vector3 LotusCenter = new Vector3(0f, 0f, 0.45f); // between the player and the desk
         const string StoneAlbedo = "Assets/Maliang/Art/Textures/stone_albedo.png";
         const string StoneNormal = "Assets/Maliang/Art/Textures/stone_normal.png";
+        const string ScrollPrefabPath = "Assets/Maliang/Prefabs/Scroll.prefab";
+        const string ScrollQuadPath = "Assets/Maliang/Art/Desk/ScrollQuad.asset";
+        static readonly Vector2 SpareScrollXZ = new Vector2(0f, 0.97f); // rolled spare, lying across the back of the desk
         const string RollerWoodTex = "Assets/Maliang/Art/NodeBrush/Models/table/古木.jpg";
 
         // Decorative desk props that overlap our tools or look grabbable (loose brushes, brush pot, brush rest),
@@ -76,6 +79,7 @@ namespace Maliang.EditorTools
         const float DeskYaw = -135f;             // the FBX is modelled at 45°, stool on one side; this faces the stool to -Z
         static readonly Vector2 ScrollSize = new Vector2(0.72f, 0.36f);
         const float ScrollFrontInset = 0.07f;    // gap between desk front edge and scroll
+        const float RodRadius = 0.011f;          // scroll rods
         public const float BrushHairLength = 0.02f; // bristle part of the pen mesh, from the tip (see BrushMeshSplitter)
 
         static readonly (string name, Color color)[] Paints =
@@ -132,28 +136,28 @@ namespace Maliang.EditorTools
             // Desk
             var deskTop = BuildDesk(report, out var deskRoot);
 
-            // Scroll
-            var scrollRoot = new GameObject("Scroll");
-            float scrollZ = deskTop.min.z + ScrollFrontInset + ScrollSize.y * 0.5f;
-            scrollRoot.transform.position = new Vector3(deskTop.center.x, deskTop.max.y + 0.004f, scrollZ);
-            var canvasGo = new GameObject("InkCanvas", typeof(MeshFilter), typeof(MeshRenderer));
-            canvasGo.transform.SetParent(scrollRoot.transform, false);
-            var canvas = canvasGo.AddComponent<InkCanvas>();
-            canvas.size = ScrollSize;
-            canvas.displayMaterial = ScrollMaterial();
-            canvas.BuildMesh(); // edit-mode preview; replaced at runtime
-            canvasGo.GetComponent<MeshRenderer>().sharedMaterial = canvas.displayMaterial;
-            canvas.stampShader = Shader.Find("Hidden/Maliang/BrushStamp");
-            canvasGo.GetComponent<MeshRenderer>().shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-            BuildRollers(scrollRoot.transform);
-
-            var ritual = scrollRoot.AddComponent<ScrollRitual>();
-            ritual.canvas = canvas;
-            ritual.scrollRoot = scrollRoot.transform;
-            ritual.head = head;
-            scrollRoot.AddComponent<DeskDebugKeys>().ritual = ritual;
-
             float surfaceY = deskTop.max.y;
+
+            // Drawing spot, the scroll on it (starts rolled up in the middle and unrolls), and a rolled spare at the back
+            var stationGo = new GameObject("Scroll Station");
+            float scrollZ = deskTop.min.z + ScrollFrontInset + ScrollSize.y * 0.5f;
+            stationGo.transform.position = new Vector3(deskTop.center.x, surfaceY + 0.004f, scrollZ);
+            var station = stationGo.AddComponent<ScrollStation>();
+            var scrollPrefab = BuildScrollPrefab();
+            station.scrollPrefab = scrollPrefab;
+            station.head = head;
+
+            var ritual = PlaceScroll(scrollPrefab, "Scroll", stationGo.transform.position, Quaternion.identity, head, ScrollStartMode.UnrollOnStart, false, station);
+            var canvas = ritual.canvas;
+            station.active = ritual;
+
+            var spareSpot = new GameObject("Spare Spot").transform;
+            spareSpot.SetParent(stationGo.transform, false);
+            spareSpot.SetPositionAndRotation(new Vector3(SpareScrollXZ.x, surfaceY + 0.004f, SpareScrollXZ.y), Quaternion.Euler(0f, 90f, 0f));
+            station.spareSpot = spareSpot;
+            var spare = PlaceScroll(scrollPrefab, "Scroll (Spare)", spareSpot.position, spareSpot.rotation, head, ScrollStartMode.Rolled, true, station);
+            station.spare = spare.GetComponent<ScrollPickup>();
+            stationGo.AddComponent<DeskDebugKeys>().station = station;
             float rightX = deskTop.center.x + ScrollSize.x * 0.5f;
 
             // Paints: two rows of five at the front right, between the scroll roller and the desk edge
@@ -167,6 +171,7 @@ namespace Maliang.EditorTools
 
             // Brush, standing upright behind the paints, clear of the scroll roller and the inkstone
             var pen = BuildBrush(canvas, new Vector3(rightX + 0.055f, surfaceY + 0.03f, deskTop.min.z + 0.06f + 2.2f * DishSpacing));
+            pen.station = station; // paints on whichever scroll is on the desk
 
             // Tripo inkstone in place of the desk model's round 古砚 (desk left), lotus candle stand at the back right
             report.Add(BuildInkstone(surfaceY));
@@ -175,6 +180,7 @@ namespace Maliang.EditorTools
             // Seals side by side at the front left, in front of the inkstone
             BuildSeal("Seal 物 (Object)", SealType.Object, SealWu, SealObjectModel, canvas, ritual, new Vector3(SealObjectXZ.x, surfaceY, SealObjectXZ.y));
             BuildSeal("Seal 境 (World)", SealType.World, SealJing, SealWorldModel, canvas, ritual, new Vector3(SealWorldXZ.x, surfaceY, SealWorldXZ.y));
+            foreach (var seal in Object.FindObjectsByType<SealStamp>(FindObjectsInactive.Include)) seal.station = station;
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.55f, 0.55f, 0.6f);
@@ -183,7 +189,7 @@ namespace Maliang.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AddToBuildSettings(ScenePath);
-            report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, scroll at {scrollRoot.transform.position}, pen at {pen.transform.position}");
+            report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, scroll at {ritual.transform.position}, spare at {spare.transform.position}, pen at {pen.transform.position}");
             return string.Join("\n", report);
         }
 
@@ -453,6 +459,86 @@ namespace Maliang.EditorTools
 
         // ------------------------------------------------------------------ scroll
 
+        /// <summary>
+        /// Builds the scroll (paper canvas, rods with their paper rolls, ritual + unroll, grab collider around the rolled
+        /// bundle) and saves it as <see cref="ScrollPrefabPath"/>; the station spawns new spares from it.
+        /// </summary>
+        static ScrollRitual BuildScrollPrefab()
+        {
+            var root = new GameObject("Scroll");
+            var canvasGo = new GameObject("InkCanvas", typeof(MeshFilter), typeof(MeshRenderer));
+            canvasGo.transform.SetParent(root.transform, false);
+            var canvas = canvasGo.AddComponent<InkCanvas>();
+            canvas.size = ScrollSize;
+            canvas.displayMaterial = ScrollMaterial();
+            canvas.BuildMesh(); // edit-mode preview (rebuilt at runtime); saved so the prefab keeps it
+            var mf = canvasGo.GetComponent<MeshFilter>();
+            mf.sharedMesh = SaveMeshAsset(mf.sharedMesh, ScrollQuadPath);
+            var mr = canvasGo.GetComponent<MeshRenderer>();
+            mr.sharedMaterial = canvas.displayMaterial;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            canvas.stampShader = Shader.Find("Hidden/Maliang/BrushStamp");
+            var unroll = BuildRollers(root.transform, canvas);
+
+            var ritual = root.AddComponent<ScrollRitual>();
+            ritual.canvas = canvas;
+            ritual.scrollRoot = root.transform;
+            ritual.unroll = unroll;
+
+            // Grabbed by the rolled-up bundle (both rods together in the middle); off once it lies open on the desk.
+            var box = root.AddComponent<BoxCollider>();
+            box.center = new Vector3(0f, unroll.rolledRadius - unroll.restDrop, 0f);
+            box.size = new Vector3(unroll.rolledRadius * 4f + 0.004f, unroll.rolledRadius * 2f + 0.002f, ScrollSize.y + 0.05f);
+            ConfigureGrab(root);
+            var pickup = root.AddComponent<ScrollPickup>();
+            pickup.grabCollider = box;
+
+            EnsureFolder(ParentFolder(ScrollPrefabPath));
+            var prefab = PrefabUtility.SaveAsPrefabAsset(root, ScrollPrefabPath);
+            Object.DestroyImmediate(root);
+            return prefab.GetComponent<ScrollRitual>();
+        }
+
+        static ScrollRitual PlaceScroll(ScrollRitual prefab, string name, Vector3 position, Quaternion rotation, Transform head,
+            ScrollStartMode mode, bool pickable, ScrollStation station)
+        {
+            var go = (GameObject)PrefabUtility.InstantiatePrefab(prefab.gameObject);
+            go.name = name;
+            go.transform.SetPositionAndRotation(position, rotation);
+            var ritual = go.GetComponent<ScrollRitual>();
+            ritual.head = head;
+            ritual.startMode = mode;
+            if (mode == ScrollStartMode.Rolled) ritual.unroll.SetProgress(0f); // looks rolled up in the editor too
+            var pickup = go.GetComponent<ScrollPickup>();
+            pickup.pickableOnStart = pickable;
+            pickup.station = station;
+            return ritual;
+        }
+
+        static Mesh SaveMeshAsset(Mesh mesh, string path)
+        {
+            EnsureFolder(ParentFolder(path));
+            var existing = AssetDatabase.LoadAssetAtPath<Mesh>(path);
+            if (existing == null)
+            {
+                AssetDatabase.CreateAsset(mesh, path);
+                return mesh;
+            }
+            EditorUtility.CopySerialized(mesh, existing);
+            Object.DestroyImmediate(mesh);
+            EditorUtility.SetDirty(existing);
+            return existing;
+        }
+
+        static string ParentFolder(string assetPath) => assetPath.Substring(0, assetPath.LastIndexOf('/'));
+
+        static void EnsureFolder(string path)
+        {
+            if (AssetDatabase.IsValidFolder(path)) return;
+            EnsureFolder(ParentFolder(path));
+            AssetDatabase.CreateFolder(ParentFolder(path), path.Substring(path.LastIndexOf('/') + 1));
+        }
+
         static Material ScrollMaterial()
         {
             string path = MatDir + "/ScrollDisplay.mat";
@@ -467,24 +553,53 @@ namespace Maliang.EditorTools
             return mat;
         }
 
-        static void BuildRollers(Transform scroll)
+        /// <summary>
+        /// The two rods at the scroll's short edges, each with a roll of paper around it (hidden while the scroll is open;
+        /// <see cref="ScrollUnroll"/> thickens it and brings both rods to the middle when the scroll is rolled up).
+        /// </summary>
+        static ScrollUnroll BuildRollers(Transform scroll, InkCanvas canvas)
         {
             // Aged rosewood; the texture's grain runs along V, which is the cylinder's length.
             var wood = Lit("ScrollRoller", new Color(0.95f, 0.9f, 0.88f), 0.35f);
             wood.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(RollerWoodTex));
             wood.SetTextureScale("_BaseMap", new Vector2(0.25f, 1.4f)); // ~30 cm of wood per tile around × along the rod
             EditorUtility.SetDirty(wood);
+            var paper = Lit("ScrollPaperRoll", new Color(0.93f, 0.89f, 0.8f), 0.1f);
+            var rods = new Transform[2];
+            var wraps = new Transform[2];
             foreach (float side in new[] { -1f, 1f })
             {
                 var roller = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
                 roller.name = side < 0 ? "Roller L" : "Roller R";
                 Object.DestroyImmediate(roller.GetComponent<Collider>());
                 roller.transform.SetParent(scroll, false);
-                roller.transform.localPosition = new Vector3(side * (ScrollSize.x * 0.5f + 0.011f), 0.006f, 0f);
+                roller.transform.localPosition = new Vector3(side * (ScrollSize.x * 0.5f + RodRadius), RodRadius - 0.005f, 0f);
                 roller.transform.localRotation = Quaternion.Euler(90f, 0f, 0f);
-                roller.transform.localScale = new Vector3(0.022f, ScrollSize.y * 0.5f + 0.025f, 0.022f);
+                roller.transform.localScale = new Vector3(RodRadius * 2f, ScrollSize.y * 0.5f + 0.025f, RodRadius * 2f);
                 roller.GetComponent<Renderer>().sharedMaterial = wood;
+                rods[side < 0 ? 0 : 1] = roller.transform;
+
+                var wrap = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
+                wrap.name = side < 0 ? "Paper Roll L" : "Paper Roll R";
+                Object.DestroyImmediate(wrap.GetComponent<Collider>());
+                wrap.transform.SetParent(scroll, false);
+                wrap.transform.localPosition = roller.transform.localPosition;
+                wrap.transform.localRotation = roller.transform.localRotation;
+                wrap.transform.localScale = new Vector3(RodRadius * 2f, ScrollSize.y * 0.5f, RodRadius * 2f); // as long as the paper is deep
+                var wr = wrap.GetComponent<Renderer>();
+                wr.sharedMaterial = paper;
+                wr.enabled = false; // the scene is laid out open
+                wraps[side < 0 ? 0 : 1] = wrap.transform;
             }
+
+            var unroll = scroll.gameObject.AddComponent<ScrollUnroll>();
+            unroll.canvas = canvas;
+            unroll.rodLeft = rods[0];
+            unroll.rodRight = rods[1];
+            unroll.wrapLeft = wraps[0];
+            unroll.wrapRight = wraps[1];
+            unroll.rodRadius = RodRadius;
+            return unroll;
         }
 
         // ------------------------------------------------------------------ brush

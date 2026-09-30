@@ -21,6 +21,8 @@ namespace Maliang.Drawing
         [Tooltip("Size of the stamping face in metres (local X, local Z of the face).")]
         public Vector2 faceSize = new Vector2(0.05f, 0.05f);
 
+        [Tooltip("Stamps this station's active scroll. Without a station, the canvas / ritual below.")]
+        public ScrollStation station;
         public InkCanvas canvas;
         public ScrollRitual ritual;
 
@@ -36,9 +38,13 @@ namespace Maliang.Drawing
 
         bool _armed = true;
 
+        ScrollRitual Ritual => station != null && station.Active != null ? station.Active : ritual;
+        InkCanvas Canvas => station != null && station.Active != null ? station.Active.canvas : canvas;
+
         void Update()
         {
-            if (!IsHeld || canvas == null || ritual == null || face == null) return;
+            var canvas = Canvas;
+            if (!IsHeld || canvas == null || Ritual == null || face == null) return;
 
             bool inside = canvas.TryProject(face.position, out _, out float height);
             if (height > rearmHeight || !inside) _armed = true;
@@ -55,6 +61,8 @@ namespace Maliang.Drawing
         /// <summary>Stamps at the face's current pose, if the ritual allows it. Public for editor / desktop testing.</summary>
         public bool TryStamp()
         {
+            var ritual = Ritual;
+            var canvas = Canvas;
             if (!ritual.CanSeal)
             {
                 // Not enough ink: the seal refuses to take (TechPlan §5.1). Small bump, nothing printed.
@@ -78,7 +86,7 @@ namespace Maliang.Drawing
 
         Vector2 ProjectUv(Vector3 faceLocal)
         {
-            canvas.TryProject(face.TransformPoint(faceLocal), out var uv, out _);
+            Canvas.TryProject(face.TransformPoint(faceLocal), out var uv, out _);
             return uv;
         }
 
