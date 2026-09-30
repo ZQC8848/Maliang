@@ -9,6 +9,7 @@ using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
+using UnityEngine.XR.Interaction.Toolkit.Locomotion.Jump;
 
 namespace Maliang.EditorTools
 {
@@ -48,6 +49,7 @@ namespace Maliang.EditorTools
         static readonly Vector3 LotusCenter = new Vector3(0f, 0f, 0.45f); // between the player and the desk
         const string StoneAlbedo = "Assets/Maliang/Art/Textures/stone_albedo.png";
         const string StoneNormal = "Assets/Maliang/Art/Textures/stone_normal.png";
+        const string RollerWoodTex = "Assets/Maliang/Art/NodeBrush/Models/table/古木.jpg";
 
         // Decorative desk props that overlap our tools or look grabbable (loose brushes, brush pot, brush rest),
         // plus the felt mat and its two paperweights, which sit exactly where the scroll goes.
@@ -69,6 +71,7 @@ namespace Maliang.EditorTools
         };
 
         // Layout (metres)
+        const float PlayerStepOffset = 0.3f;     // highest step the player can walk up (the rig ships with 0.5)
         const float DeskFrontZ = 0.38f;          // near edge of the tabletop, in front of the player
         const float DeskYaw = -135f;             // the FBX is modelled at 45°, stool on one side; this faces the stool to -Z
         static readonly Vector2 ScrollSize = new Vector2(0.72f, 0.36f);
@@ -124,6 +127,7 @@ namespace Maliang.EditorTools
             var rig = (GameObject)PrefabUtility.InstantiatePrefab(AssetDatabase.LoadAssetAtPath<GameObject>(XrOriginPrefab));
             rig.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
             var head = rig.GetComponentInChildren<Camera>().transform;
+            report.Add(KeepPlayerOffDesk(rig));
 
             // Desk
             var deskTop = BuildDesk(report, out var deskRoot);
@@ -181,6 +185,21 @@ namespace Maliang.EditorTools
             AddToBuildSettings(ScenePath);
             report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, scroll at {scrollRoot.transform.position}, pen at {pen.transform.position}");
             return string.Join("\n", report);
+        }
+
+        // ------------------------------------------------------------------ player
+
+        /// <summary>
+        /// The player must never end up on the desk (tabletop 0.745 m, open drawers ~0.68 m): a human-sized step
+        /// instead of the rig's 0.5 m, and no jumping in this scene (a jump reaches the drawers, then the tabletop).
+        /// </summary>
+        static string KeepPlayerOffDesk(GameObject rig)
+        {
+            var cc = rig.GetComponent<CharacterController>();
+            if (cc != null) cc.stepOffset = PlayerStepOffset;
+            var jump = rig.GetComponentInChildren<JumpProvider>(true);
+            if (jump != null) jump.gameObject.SetActive(false);
+            return $"Player: step offset {(cc != null ? cc.stepOffset : -1f)} m, jump {(jump != null ? "disabled" : "not found")}";
         }
 
         // ------------------------------------------------------------------ candle stand
@@ -363,6 +382,9 @@ namespace Maliang.EditorTools
             foreach (var (label, parts) in GrabbableProps)
                 report.Add(MakeGrabbableProp(model.transform, label, parts));
 
+            // The two drawers under the tabletop (the FBX only has their fronts, merged into one mesh)
+            DrawerBuilder.Build(model.transform, report);
+
             report.Add($"Tabletop bounds after placement: min={topBounds.min} max={topBounds.max}");
             return topBounds;
         }
@@ -415,6 +437,20 @@ namespace Maliang.EditorTools
             return mat;
         }
 
+        /// <summary>Matte pigment paste: low smoothness plus a faint grainy normal so it does not read as glossy plastic.</summary>
+        static Material PaintMaterial()
+        {
+            var mat = Lit("Paint", Color.white, 0.2f); // colour comes from each InkPot's property block
+            mat.SetTexture("_BumpMap", AssetDatabase.LoadAssetAtPath<Texture2D>(StoneNormal));
+            mat.SetTextureScale("_BumpMap", new Vector2(2f, 2f));
+            mat.SetFloat("_BumpScale", 0.3f);
+            mat.EnableKeyword("_NORMALMAP");
+            mat.SetFloat("_EnvironmentReflections", 0f);
+            mat.EnableKeyword("_ENVIRONMENTREFLECTIONS_OFF");
+            EditorUtility.SetDirty(mat);
+            return mat;
+        }
+
         // ------------------------------------------------------------------ scroll
 
         static Material ScrollMaterial()
@@ -433,7 +469,11 @@ namespace Maliang.EditorTools
 
         static void BuildRollers(Transform scroll)
         {
-            var wood = Lit("ScrollRoller", new Color(0.28f, 0.14f, 0.08f), 0.45f);
+            // Aged rosewood; the texture's grain runs along V, which is the cylinder's length.
+            var wood = Lit("ScrollRoller", new Color(0.95f, 0.9f, 0.88f), 0.35f);
+            wood.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(RollerWoodTex));
+            wood.SetTextureScale("_BaseMap", new Vector2(0.25f, 1.4f)); // ~30 cm of wood per tile around × along the rod
+            EditorUtility.SetDirty(wood);
             foreach (float side in new[] { -1f, 1f })
             {
                 var roller = GameObject.CreatePrimitive(PrimitiveType.Cylinder);
@@ -522,7 +562,7 @@ namespace Maliang.EditorTools
             paint.transform.SetParent(root.transform, false);
             paint.transform.localPosition = new Vector3(0f, 0.0235f, 0f);
             paint.transform.localScale = new Vector3(DishDiameter * 0.82f, 0.0015f, DishDiameter * 0.82f);
-            paint.GetComponent<Renderer>().sharedMaterial = Lit("Paint", Color.white, 0.85f);
+            paint.GetComponent<Renderer>().sharedMaterial = PaintMaterial();
 
             // Dip zone: from the paint surface up to ~2 cm above it.
             var box = root.AddComponent<BoxCollider>();
