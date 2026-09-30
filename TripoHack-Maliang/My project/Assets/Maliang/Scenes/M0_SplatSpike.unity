@@ -159,7 +159,7 @@ MonoBehaviour:
   sourceCoordinates: 6
   alignment:
     metricScaleFactor: 2
-    groundPlaneOffset: 5
+    groundPlaneOffset: 1
     extraEulerRotation: {x: 0, y: 0, z: 0}
   loader: {fileID: 582607917}
   hudCamera: {fileID: 391754863}
