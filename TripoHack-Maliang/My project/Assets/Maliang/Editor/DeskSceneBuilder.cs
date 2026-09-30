@@ -212,9 +212,21 @@ namespace Maliang.EditorTools
             var col = root.AddComponent<BoxCollider>();
             col.center = root.transform.InverseTransformPoint(RendererBounds(model).center);
             col.size = b.size;
+
+            // A lit red candle in the lotus cup: the cup floor is the highest point of the mesh close to its axis.
+            b = RendererBounds(model);
+            float cupFloor = float.MinValue;
+            foreach (var mf in model.GetComponentsInChildren<MeshFilter>())
+                foreach (var v in mf.sharedMesh.vertices)
+                {
+                    var w = mf.transform.TransformPoint(v);
+                    if (new Vector2(w.x - b.center.x, w.z - b.center.z).magnitude < 0.012f) cupFloor = Mathf.Max(cupFloor, w.y);
+                }
+            var flame = CandleFlameBuilder.Build(root.transform, new Vector3(b.center.x, cupFloor, b.center.z));
+
             ConfigureGrab(root);
             root.AddComponent<GrabbableTool>();
-            return $"Candle stand at {root.transform.position}, size {b.size}";
+            return $"Candle stand at {root.transform.position}, size {b.size}; candle in the cup at y={cupFloor:F3}, flame tip at {flame.Tip.position}";
         }
 
         // ------------------------------------------------------------------ inkstone
