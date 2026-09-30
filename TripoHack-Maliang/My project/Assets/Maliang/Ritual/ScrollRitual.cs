@@ -1,7 +1,9 @@
 using System;
 using System.Collections;
+using System.Collections.Generic;
 using Maliang.Core;
 using Maliang.Drawing;
+using Maliang.VR;
 using UnityEngine;
 
 namespace Maliang.Ritual
@@ -66,14 +68,36 @@ namespace Maliang.Ritual
         public float bobAmplitude = 0.012f;
         public float bobPeriod = 3.2f;
 
+        [Header("Hover clearance")]
+        [Tooltip("Before rising, the hover spot is checked for objects and other hovering scrolls. If it is taken the " +
+                 "scroll moves up in these steps (m) first, then sideways.")]
+        public float clearanceStep = 0.05f;
+        [Tooltip("Furthest it moves up to find room (m).")]
+        public float maxLiftUp = 0.6f;
+        [Tooltip("Furthest it moves sideways to find room (m), when moving up is not enough.")]
+        public float maxShiftSide = 0.9f;
+        [Tooltip("Extra room kept around the scroll (m).")]
+        public float clearanceMargin = 0.02f;
+
+        /// <summary>World box this scroll has claimed for hovering (set when it starts to rise).</summary>
+        public Bounds HoverReservation { get; private set; }
+        public bool HasHoverReservation { get; private set; }
+
+        static readonly List<ScrollRitual> All = new List<ScrollRitual>();
+        static readonly Collider[] Hits = new Collider[64];
+
         public ScrollState State { get; private set; } = ScrollState.Unrolled;
         public SealType? Seal { get; private set; }
         /// <summary>True once the rise animation has finished and the scroll is hovering.</summary>
         public bool IsHovering { get; private set; }
+        /// <summary>Held by the player while hovering: the bobbing pauses and it hovers where it is let go.</summary>
+        public bool IsHeld { get; private set; }
 
         public event Action Unrolled;
         public event Action<SealType> Sealed;
         public event Action Hovering;
+        /// <summary>Put back on the desk (reset).</summary>
+        public event Action ReturnedToDesk;
 
         Vector3 _deskPos;
         Quaternion _deskRot;
@@ -88,6 +112,9 @@ namespace Maliang.Ritual
         public bool CanSeal => State == ScrollState.Unrolled && canvas.InkCoverage >= minInkCoverage;
         /// <summary>True once the scroll has left the desk: hovering after its seal, or further on in the ritual.</summary>
         public bool OffDesk => State >= ScrollState.Burning || (State == ScrollState.Levitating && IsHovering);
+
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
 
         void Awake()
         {
@@ -167,6 +194,7 @@ namespace Maliang.Ritual
             Vector3 toPlayer = -fwd;
             Quaternion upright = Quaternion.LookRotation(Vector3.up, toPlayer);
             Quaternion hoverRot = Quaternion.AngleAxis(-hoverTiltBack, Vector3.Cross(Vector3.up, toPlayer)) * upright;
+            _hoverPos = FindClearHover(_hoverPos, hoverRot);
 
             Vector3 p0 = Root.position;
             Quaternion r0 = Root.rotation;
@@ -188,9 +216,97 @@ namespace Maliang.Ritual
             Hovering?.Invoke();
         }
 
+        // ------------------------------------------------------------------ hover clearance
+
+        /// <summary>
+        /// The nearest free hover spot to <paramref name="desired"/>: straight up first (in <see cref="clearanceStep"/>s,
+        /// up to <see cref="maxLiftUp"/>), then alternately right and left (up to <see cref="maxShiftSide"/>), each
+        /// sideways spot again trying the lowest height first. Claims the spot so later scrolls avoid it.
+        /// </summary>
+        Vector3 FindClearHover(Vector3 desired, Quaternion rot)
+        {
+            Vector3 half = HoverHalfExtents();
+            Vector3 up = Vector3.up;
+            Vector3 side = Vector3.ProjectOnPlane(rot * Vector3.right, Vector3.up).normalized;
+            float step = Mathf.Max(0.01f, clearanceStep);
+            int ups = Mathf.FloorToInt(maxLiftUp / step);
+            int sides = Mathf.FloorToInt(maxShiftSide / step);
+
+            for (int s = 0; s <= sides; s++)
+            {
+                for (int sign = 1; sign >= -1; sign -= 2)
+                {
+                    if (s == 0 && sign < 0) continue;
+                    for (int u = 0; u <= ups; u++)
+                    {
+                        Vector3 p = desired + up * (u * step) + side * (sign * s * step);
+                        if (!IsClear(p, rot, half)) continue;
+                        Reserve(p, rot, half);
+                        if (s > 0 || u > 0)
+                            MaliangLog.Info("Ritual", $"Hover spot taken; moved up {u * step:F2} m, sideways {sign * s * step:F2} m.");
+                        return p;
+                    }
+                }
+            }
+            MaliangLog.Warn("Ritual", "No free hover spot nearby; hovering at the default spot.");
+            Reserve(desired, rot, half);
+            return desired;
+        }
+
+        /// <summary>The open scroll as a box in its own frame: width along X (paper + rods), depth along Z, thin along Y.</summary>
+        Vector3 HoverHalfExtents() =>
+            new Vector3(canvas.size.x * 0.5f + 0.03f, 0.025f, canvas.size.y * 0.5f + 0.03f) + Vector3.one * clearanceMargin;
+
+        /// <summary>
+        /// The player picked up (true) or let go of (false) the hovering scroll. Let go, it hovers where it is: no
+        /// gravity, no return, the gentle bob resumes there and that spot is claimed for later scrolls.
+        /// </summary>
+        public void SetHeld(bool held)
+        {
+            IsHeld = held;
+            if (held || !IsHovering) return;
+            _hoverPos = Root.position;
+            _hoverTime = 0f; // bob starts from its middle, so there is no jump
+            Reserve(Root.position, Root.rotation, HoverHalfExtents());
+        }
+
+        bool IsClear(Vector3 centre, Quaternion rot, Vector3 half)
+        {
+            int n = Physics.OverlapBoxNonAlloc(centre, half, Hits, rot, ~0, QueryTriggerInteraction.Ignore);
+            var rig = Head != null ? Head.root : null;
+            for (int i = 0; i < n; i++)
+            {
+                var t = Hits[i].transform;
+                if (t.IsChildOf(transform)) continue;                    // this scroll
+                if (rig != null && t.IsChildOf(rig)) continue;           // the player
+                var tool = Hits[i].GetComponentInParent<GrabbableTool>();
+                if (tool != null && tool.IsHeld) continue;               // something in the player's hand
+                return false;
+            }
+            // Hovering scrolls have no active colliders: check the spots they have claimed.
+            var box = WorldBox(centre, rot, half);
+            foreach (var other in All)
+                if (other != this && other.HasHoverReservation && other.HoverReservation.Intersects(box)) return false;
+            return true;
+        }
+
+        void Reserve(Vector3 centre, Quaternion rot, Vector3 half)
+        {
+            HoverReservation = WorldBox(centre, rot, half);
+            HasHoverReservation = true;
+        }
+
+        static Bounds WorldBox(Vector3 centre, Quaternion rot, Vector3 half)
+        {
+            var b = new Bounds(centre, Vector3.zero);
+            for (int i = 0; i < 8; i++)
+                b.Encapsulate(centre + rot * Vector3.Scale(half, new Vector3((i & 1) == 0 ? -1 : 1, (i & 2) == 0 ? -1 : 1, (i & 4) == 0 ? -1 : 1)));
+            return b;
+        }
+
         void Update()
         {
-            if (!IsHovering || State != ScrollState.Levitating) return;
+            if (!IsHovering || State != ScrollState.Levitating || IsHeld) return;
             _hoverTime += Time.deltaTime;
             float bob = Mathf.Sin(_hoverTime * Mathf.PI * 2f / bobPeriod) * bobAmplitude;
             Root.position = _hoverPos + Vector3.up * bob;
@@ -205,8 +321,11 @@ namespace Maliang.Ritual
             canvas.ClearAll();
             Seal = null;
             IsHovering = false;
+            IsHeld = false;
+            HasHoverReservation = false;
             State = ScrollState.Unrolled;
             MaliangLog.Info("Ritual", "Scroll reset.");
+            ReturnedToDesk?.Invoke();
             RollUpAndUnroll(0.3f, animateRollUp: true); // roll up, then a fresh sheet unrolls again
         }
     }

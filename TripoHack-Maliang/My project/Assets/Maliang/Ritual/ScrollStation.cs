@@ -43,7 +43,8 @@ namespace Maliang.Ritual
 
         public bool WouldAccept(ScrollPickup pickup)
         {
-            if (pickup == null || !SlotFree) return false;
+            // Only a rolled-up scroll can be laid down (not a sealed one carried back, nor the one already here).
+            if (pickup == null || !SlotFree || pickup.Ritual == active || pickup.Ritual.State != ScrollState.Rolled) return false;
             Vector3 d = pickup.transform.position - transform.position;
             return new Vector2(d.x, d.z).magnitude <= acceptRadius && d.y > -0.05f && d.y <= acceptHeight;
         }

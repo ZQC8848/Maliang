@@ -4,9 +4,11 @@ using UnityEngine;
 namespace Maliang.Ritual
 {
     /// <summary>
-    /// Lets a rolled-up scroll be picked up and laid on the desk's drawing spot (<see cref="ScrollStation"/>).
-    /// Released over a free drawing spot, the station takes it; released anywhere else, it glides back to where it lay.
-    /// The scroll on the desk (and one that has been sealed) is not pickable.
+    /// Picking up a scroll.
+    /// Rolled up (the spare): released over a free drawing spot (<see cref="ScrollStation"/>) it is laid down there;
+    /// released anywhere else it glides back to where it lay.
+    /// Sealed and hovering: it can be carried anywhere; let go, it stays there and keeps hovering (no gravity).
+    /// The scroll being drawn on is not pickable.
     /// </summary>
     [RequireComponent(typeof(ScrollRitual))]
     public class ScrollPickup : GrabbableTool
@@ -14,7 +16,7 @@ namespace Maliang.Ritual
         public ScrollStation station;
         [Tooltip("Pickable when the scene starts (the spare), or not (the scroll already on the desk).")]
         public bool pickableOnStart = true;
-        [Tooltip("Collider around the rolled-up scroll, used for grabbing.")]
+        [Tooltip("Grab box; sized to the rolled-up bundle, or to the whole scroll once it hovers open.")]
         public Collider grabCollider;
 
         public ScrollRitual Ritual { get; private set; }
@@ -25,9 +27,52 @@ namespace Maliang.Ritual
         {
             base.Awake();
             Ritual = GetComponent<ScrollRitual>();
+            Ritual.Hovering += OnHovering;
+            Ritual.ReturnedToDesk += OnReturnedToDesk;
         }
 
-        void Start() => SetPickable(pickableOnStart);
+        void OnDestroy()
+        {
+            if (Ritual == null) return;
+            Ritual.Hovering -= OnHovering;
+            Ritual.ReturnedToDesk -= OnReturnedToDesk;
+        }
+
+        void Start()
+        {
+            FitCollider(open: false);
+            SetPickable(pickableOnStart);
+        }
+
+        void OnHovering()
+        {
+            FitCollider(open: true);
+            SetPickable(true);
+        }
+
+        void OnReturnedToDesk()
+        {
+            FitCollider(open: false);
+            SetPickable(false);
+        }
+
+        /// <summary>Sizes the grab box to the rolled-up bundle, or to the whole open scroll.</summary>
+        public void FitCollider(bool open)
+        {
+            if (!(grabCollider is BoxCollider box) || Ritual.unroll == null) return;
+            var u = Ritual.unroll;
+            float depth = Ritual.canvas.size.y + 0.05f; // rods overhang the paper
+            if (open)
+            {
+                box.center = new Vector3(0f, u.rodRadius - u.restDrop, 0f);
+                box.size = new Vector3(Ritual.canvas.size.x + u.rodRadius * 4f + 0.004f, u.rodRadius * 2f + 0.01f, depth);
+            }
+            else
+            {
+                box.center = new Vector3(0f, u.rolledRadius - u.restDrop, 0f);
+                box.size = new Vector3(u.rolledRadius * 4f + 0.004f, u.rolledRadius * 2f + 0.002f, depth);
+            }
+        }
 
         public void SetPickable(bool pickable)
         {
@@ -43,8 +88,19 @@ namespace Maliang.Ritual
             _overSpot = over;
         }
 
+        protected override void OnGrabbed()
+        {
+            if (Ritual.OffDesk) Ritual.SetHeld(true); // pauses the hover bob
+        }
+
         protected override void OnReleased()
         {
+            if (Ritual.OffDesk)
+            {
+                returnOnRelease = false; // stays where it was let go
+                Ritual.SetHeld(false);
+                return;
+            }
             bool accepted = station != null && station.TryAccept(this);
             returnOnRelease = !accepted; // not taken: glide back to where it lay
         }

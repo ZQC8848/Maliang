@@ -48,6 +48,26 @@ namespace Maliang.Drawing
         [Tooltip("Stroke size multiplier on top of pressure (see BrushStroke.SizeMultiplier).")]
         public float sizeMultiplier = 0.3f;
 
+        // The paper has no physical resistance, so the hand is told through the controller: a light tick when the nib
+        // touches, a faint grain while it moves on the paper (stronger the harder it presses, none while it rests),
+        // and a firmer bump when it is pushed so deep that painting is about to stop.
+        [Header("Haptics")]
+        public bool haptics = true;
+        [Tooltip("Scales every brush vibration (0 = off).")]
+        [Range(0f, 2f)] public float hapticStrength = 1f;
+        [Tooltip("Tick when the nib touches the paper: amplitude, duration (s).")]
+        public Vector2 touchPulse = new Vector2(0.15f, 0.02f);
+        [Tooltip("Grain while painting: amplitude at a light touch → at full press.")]
+        public Vector2 grainAmplitude = new Vector2(0.03f, 0.2f);
+        [Tooltip("Nib speed along the paper (m/s): no grain below x, full grain from y.")]
+        public Vector2 grainSpeed = new Vector2(0.02f, 0.3f);
+        [Tooltip("Grain pulses are sent this often (s); each lasts a little longer so they run together.")]
+        public float grainInterval = 0.05f;
+        [Tooltip("Pushed this deep below the paper (m) gives the warning bump (painting stops at maxPenetration).")]
+        public float deepWarnDepth = 0.045f;
+        [Tooltip("Warning bump: amplitude, duration (s).")]
+        public Vector2 deepPulse = new Vector2(0.5f, 0.06f);
+
         [Header("Bristle animation (BonePen)")]
         public Animator boneAnimator;
         [Range(0f, 1f)] public float boneWeight = 0.92f;
@@ -59,8 +79,13 @@ namespace Maliang.Drawing
         MaterialPropertyBlock _mpb;
         Vector3 _lastBonePos, _boneDir;
         float _boneTimer;
+        Vector3 _lastNibPos;
+        float _grainTimer;
+        bool _touching, _deepWarned;
 
         public bool IsDrawing => _stroke != null && _stroke.Active;
+        /// <summary>Every brush vibration sent (amplitude, duration), e.g. to drive a brush-on-paper sound.</summary>
+        public event System.Action<float, float> Vibrated;
         /// <summary>The canvas being painted on: the station's active scroll, else <see cref="canvas"/>.</summary>
         public InkCanvas Canvas => station != null && station.Active != null ? station.Active.canvas : canvas;
         public Texture CurrentStyle => styles != null && styles.Length > 0 ? styles[Mathf.Clamp(styleIndex, 0, styles.Length - 1)] : null;
@@ -95,10 +120,17 @@ namespace Maliang.Drawing
                 _strokeCanvas = target;
             }
             if (_stroke == null || nib == null) return;
-            if (!IsHeld || target.InputLocked) { _stroke.End(); return; }
+            // Nib speed along the paper, for the grain.
+            Vector3 moved = Vector3.ProjectOnPlane(nib.position - _lastNibPos, target.transform.up);
+            float speed = moved.magnitude / Mathf.Max(Time.deltaTime, 1e-4f);
+            _lastNibPos = nib.position;
 
-            if (target.TryProject(nib.position, out var uv, out float height) &&
-                height <= contactHeight && height >= -maxPenetration)
+            if (!IsHeld || target.InputLocked) { _stroke.End(); _touching = false; _deepWarned = false; return; }
+
+            bool inside = target.TryProject(nib.position, out var uv, out float height);
+            UpdateDeepWarning(inside, height);
+
+            if (inside && height <= contactHeight && height >= -maxPenetration)
             {
                 float depth = Mathf.Max(0f, -height);
                 float t = Mathf.Pow(Mathf.Clamp01(depth / Mathf.Max(0.001f, pressDepth)), pressureCurve);
@@ -109,11 +141,51 @@ namespace Maliang.Drawing
                 _stroke.Color = inkColor;
                 _stroke.SizeMultiplier = sizeMultiplier;
                 _stroke.AddPoint(target.UvToPixel(uv), pressure);
+
+                if (!_touching) { Buzz(touchPulse.x, touchPulse.y); _grainTimer = grainInterval; } // pen down
+                _touching = true;
+                Grain(t, speed);
             }
             else
             {
                 _stroke.End();
+                _touching = false;
             }
+        }
+
+        /// <summary>Faint grain while the nib moves on the paper: stronger with pressure, scaled by speed, none at rest.</summary>
+        void Grain(float press, float speed)
+        {
+            _grainTimer -= Time.deltaTime;
+            if (_grainTimer > 0f) return;
+            _grainTimer = grainInterval;
+            float move = Mathf.InverseLerp(grainSpeed.x, grainSpeed.y, speed);
+            if (move <= 0f) return;
+            float amp = Mathf.Lerp(grainAmplitude.x, grainAmplitude.y, press) * move * Random.Range(0.8f, 1.2f); // uneven, like paper fibre
+            Buzz(amp, grainInterval * 1.3f);
+        }
+
+        /// <summary>One firm bump when the nib goes deep enough that painting is about to stop; re-arms once it comes back up.</summary>
+        void UpdateDeepWarning(bool inside, float height)
+        {
+            float depth = -height;
+            if (inside && depth >= deepWarnDepth && !_deepWarned)
+            {
+                Buzz(deepPulse.x, deepPulse.y);
+                _deepWarned = true;
+            }
+            else if (!inside || depth < deepWarnDepth - 0.01f)
+            {
+                _deepWarned = false;
+            }
+        }
+
+        void Buzz(float amplitude, float duration)
+        {
+            if (!haptics || hapticStrength <= 0f || amplitude <= 0f) return;
+            float a = Mathf.Clamp01(amplitude * hapticStrength);
+            Haptic(a, duration);
+            Vibrated?.Invoke(a, duration);
         }
 
         void LateUpdate()
