@@ -30,32 +30,42 @@ related: "TechPlan.md"
 
 ## 阶段 0:工程与依赖
 
-- [ ] 安装 XR 相关包:OpenXR、XR Interaction Toolkit、XR Hands(如需要)
-- [ ] 项目设置:启用 OpenXR + 目标头显 Interaction Profile;Graphics API 改为 **Vulkan 或 D3D12**(Gsplat 要求);色彩空间 Linear
-- [ ] 安装 glTFast(运行时加载 GLB)
-- [ ] 引入 `wuyize25/gsplat-unity`(MIT),确认在 Unity 6.6 + URP 下编译通过
-- [ ] 建立目录 `Assets/Maliang/{Core,Drawing,Ritual,Api,Loading,Fallback,VR,Desktop,Art}` 与 `StreamingAssets/{Prompts,Fallback}`
-- [ ] 从 `ReferenceProject/Assets/Node_Brush` 拷贝要复用的资源到新工程:笔模型 `pen.FBX` + 动画、11 张笔触贴图、`penDraw.shader`、书桌 FBX 与贴图、印章插画
-- [ ] 补 `.gitattributes`:把 `.glb`、`.gltf`、`.spz` 加入 LFS 规则
-- [ ] 建配置系统骨架:`Config` 读取 exe 旁的 `maliang.config.json`;提交 `maliang.config.example.json`(真实文件已在 `.gitignore`)
-- [ ] 日志封装(分级、可写文件),后续 API 错误分类使用
-- [ ] 验证 Unity MCP 可用(已连通),约定 Claude 通过 MCP 建场景/脚本的分工
+- [x] 安装 XR 相关包:OpenXR 1.18.0、XR Interaction Toolkit 3.6.1(XR Hands 暂不装,需要手部追踪时再加)
+- [x] 项目设置:OpenXR 已加入 Standalone 加载器,启用 Oculus Touch / Valve Index / HTC Vive 手柄配置;Windows 图形 API 改为 **Vulkan(首选)+ D3D12**;色彩空间已是 Linear;渲染模式 Single Pass Instanced(头显实测在阶段 1)
+- [x] 安装 glTFast 6.20.0(运行时加载 GLB)
+- [x] 引入 `wuyize25/gsplat-unity`(锁定 commit `a2bf458`),在 Unity 6.6 + URP 下编译通过;`GsplatURPFeature` 已加入 `PC_Renderer`(6.6 里 Render Graph 兼容模式设置已废弃,无需再关)
+- [x] 建立目录 `Assets/Maliang/{Core,Drawing,Ritual,Api,Loading,Fallback,VR,Desktop,Art}` 与 `StreamingAssets/{Prompts,Fallback}`
+- [x] 从 `ReferenceProject/Assets/Node_Brush` 拷贝资源到 `Assets/Maliang/Art/NodeBrush/`:笔模型 + 动画、笔触贴图、`penDraw.shader`、书桌 FBX 与贴图、印章插画、材质(**材质是内置管线的,进 URP 会显示粉色,阶段 2 搭场景时转换**)。脚本没有拷,阶段 2 重写
+- [x] 补 `.gitattributes`:`.glb`、`.gltf`、`.spz` 加入 LFS 规则
+- [x] 配置系统骨架:`MaliangConfig`(`Assets/Maliang/Core/MaliangConfig.cs`)读取工程根目录(打包后 exe 旁)的 `maliang.config.json`,缺失则离线模式;`Assets/StreamingAssets/maliang.config.example.json` 已提交
+- [x] 日志封装:`MaliangLog`(分级、写 `persistentDataPath/maliang.log`、自动遮蔽已注册的 API 密钥)
+- [x] 验证 Unity MCP 可用(已连通;本阶段的包安装、渲染器与 XR 设置、场景创建都是通过 MCP 完成的)
+- [x] 导入 XRI 示例 Starter Assets 与 XR Interaction Simulator,建冒烟场景 `Assets/Maliang/Scenes/XRSmokeTest.unity`(XR Origin + 模拟器)
+- [ ] **需要你在头显上做**:重启 Unity(让 Vulkan 生效)→ 连接头显 → 打开 `XRSmokeTest` 场景 → 播放
 
 **验收:** 空场景能在头显里进入并看到手柄;工程无编译错误;Vulkan/D3D12 下运行正常。
+(编译无报错已验证;头显那一项需要真机,见上面最后一条。)
 
 ---
 
 ## 阶段 1(M0):Splat Spike —— 最大风险,先做
 
-- [ ] 用 World Labs 网页/API 手动生成一个世界,下载 `full_res` SPZ、`500k` SPZ、碰撞体 GLB、`semantics_metadata`
-- [ ] 在 Unity 中 `LoadFromSpz(path)` 加载到 `GsplatRenderer`
-- [ ] 头显实测:单通道实例化 / 多通道两种渲染模式,记录是否黑屏、左右眼错位
-- [ ] 实测帧率:`full_res`(约 2M 点) vs `500k`,记录显卡型号
-- [ ] 坐标转换:试 `SourceCoordinates` 枚举,或对 `WorldRoot` 绕 X 轴 180° 旋转,直到方向正确
-- [ ] 应用 `metric_scale_factor` 与 `ground_plane_offset`,使玩家站在地面上、尺度合理
-- [ ] 用 glTFast 加载碰撞体 GLB,套同一变换,隐藏渲染仅保留碰撞;验证站立/传送落点
-- [ ] 若 SPZ 解码异常,试 SPZ → PLY 走 `LoadFromPlyBytes` 备选
-- [ ] 写 Spike 结论(可放 `.ai/` 或本文档末尾):可用的渲染模式、推荐点数档位、变换参数
+**已就绪的工具:** 场景 `Assets/Maliang/Scenes/M0_SplatSpike.unity`(XR Origin + `SplatWorld`)。`SplatWorldLoader`(加载 SPZ / 碰撞体 GLB、应用尺度与地面偏移)和 `SplatSpikeController`(头显内 HUD + 手柄调参)在 `Assets/Maliang/Loading/`。
+**手柄:** 右 A 切换坐标约定并重载 · 右 B 绕 Y 转 180° · 左 X/Y 放大/缩小 · 左右摇杆按下 降低/升高世界 · 双手握把重置。HUD 显示 fps、最差帧、点数、坐标约定、图形 API、头显名。每 5 秒写一条数据到 `maliang.log`(`%USERPROFILE%\AppData\LocalLow\DefaultCompany\My project\maliang.log`)。
+
+- [x] 测试数据:`TestData/Splats/`(git 忽略)里有 `worldlabs_test.spz`(取自 VRSplatScene,World Labs API 输出,30MB)和 `spaceship_cabin.spz`;改 `SplatSpikeController.spzPath` 可切换
+- [ ] 用 World Labs 手动生成/导出一个世界:`full_res` SPZ、`500k` SPZ、碰撞体 GLB、`semantics_metadata`(目前只有 `Downloads` 里旧的 `Futuristic Spaceship Cabin Interior.spz`,2M 点、SH 0 阶,没有碰撞体和元数据)
+- [x] 在 Unity 中 `LoadFromSpz(path)` 加载到 `GsplatRenderer`:2,000,000 点解码约 0.4 秒,编辑器内无报错
+- [x] **先重启 Unity**:改图形 API 后编辑器仍在跑 D3D11,此时 Gsplat 加载成功但什么都不画。重启后编辑器为 Vulkan 1.1(RTX 5070 Ti Laptop)
+- [x] **关闭玩家重力**:Spike 场景没有地面,XRI 的 `GravityProvider` 会让 XR Origin 一直下落、离开 splat。已在 `M0_SplatSpike` 中把 `GravityProvider` 与各 Move Provider 的 `m_UseGravity` 关掉(接上碰撞体后可再打开)
+- [x] 头显里能看到 splat(Single Pass Instanced,`worldlabs_test.spz`,2M 点)
+- [ ] 头显实测:Single Pass Instanced(默认)是否黑屏/双眼错位;不行再试多通道(OpenXR 设置里改 Render Mode)
+- [ ] 头显实测帧率:`full_res`(约 2M 点) vs `500k`,记录显卡型号
+- [ ] 坐标转换:在头显里用右 A 循环 `SourceCoordinates`,找出方向正确的一项(TechPlan 里预期是 RDF 或加 180° 旋转)
+- [ ] 应用 `metric_scale_factor` 与 `ground_plane_offset`,使玩家站在地面上、尺度合理(需要 `semantics_metadata`;没有就先用手柄手调并记录数值)
+- [ ] 碰撞体 GLB:`SplatWorldLoader.LoadColliderAsync` 已写好,填入 `colliderGlbPath` 后验证站立/传送落点(需要匹配这个世界的 GLB)
+- [ ] 若 SPZ 解码异常,试 SPZ → PLY 走 `LoadFromPlyBytes` 备选(目前 SPZ 解码正常)
+- [ ] 写 Spike 结论:可用的渲染模式、推荐点数档位、变换参数
 
 **验收:** 头显里无黑屏、无双眼错位,帧率达标;站在地面上,碰撞体对齐。
 

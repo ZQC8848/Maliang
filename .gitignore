@@ -55,3 +55,6 @@ maliang.config.json
 # OS
 .DS_Store
 Thumbs.db
+
+# Local test data (large binaries, not for git)
+TestData/

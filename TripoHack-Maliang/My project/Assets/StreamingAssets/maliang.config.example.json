@@ -1,0 +1,9 @@
+{
+  "mode": "online",
+  "worldLabs": { "apiKey": "", "model": "marble-1.1", "splat": "full_res" },
+  "tripo": { "apiKey": "" },
+  "vision": { "provider": "openai", "apiKey": "", "model": "" },
+  "imageGen": { "enabled": true },
+  "limits": { "maxGenerationsPerSession": 6, "worldTimeoutSec": 600, "objectTimeoutSec": 240 },
+  "fallback": { "enabled": true, "fastMode": false }
+}

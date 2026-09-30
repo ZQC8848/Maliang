@@ -172,3 +172,8 @@
 
 # Exceptions for .asset files such as lightning pre-baking
 "TripoHack-Maliang/My project/**/LightingData.asset" binary
+
+# Maliang: generated / fallback 3D content
+"TripoHack-Maliang/My project/**/*.glb" lfs
+"TripoHack-Maliang/My project/**/*.gltf" lfs
+"TripoHack-Maliang/My project/**/*.spz" lfs

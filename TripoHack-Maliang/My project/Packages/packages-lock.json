@@ -31,9 +31,22 @@
     },
     "com.unity.burst": {
       "version": "2.0.0",
-      "depth": 2,
+      "depth": 1,
       "source": "builtin",
       "dependencies": {}
+    },
+    "com.unity.cloud.gltfast": {
+      "version": "6.20.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.burst": "1.8.30",
+        "com.unity.collections": "2.6.8",
+        "com.unity.mathematics": "1.3.3",
+        "com.unity.modules.jsonserialize": "1.0.0",
+        "com.unity.modules.unitywebrequest": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
     },
     "com.unity.collab-proxy": {
       "version": "2.13.6",
@@ -44,7 +57,7 @@
     },
     "com.unity.collections": {
       "version": "6.6.0",
-      "depth": 2,
+      "depth": 1,
       "source": "builtin",
       "dependencies": {
         "com.unity.burst": "1.8.25",
@@ -177,7 +190,7 @@
     },
     "com.unity.test-framework.performance": {
       "version": "6.6.0",
-      "depth": 3,
+      "depth": 2,
       "source": "builtin",
       "dependencies": {
         "com.unity.test-framework": "1.1.33",
@@ -216,6 +229,75 @@
         "com.unity.modules.jsonserialize": "1.0.0"
       },
       "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.core-utils": {
+      "version": "2.6.0",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.xr": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.interaction.toolkit": {
+      "version": "3.6.1",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.ugui": "2.0.0",
+        "com.unity.modules.xr": "1.0.0",
+        "com.unity.inputsystem": "1.8.1",
+        "com.unity.mathematics": "1.2.6",
+        "com.unity.modules.audio": "1.0.0",
+        "com.unity.modules.imgui": "1.0.0",
+        "com.unity.xr.core-utils": "2.4.0",
+        "com.unity.modules.physics": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.legacyinputhelpers": {
+      "version": "3.0.1",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.xr": "1.0.0"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.management": {
+      "version": "4.7.0",
+      "depth": 1,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.xr": "1.0.0",
+        "com.unity.xr.core-utils": "2.2.1",
+        "com.unity.modules.subsystems": "1.0.0",
+        "com.unity.xr.legacyinputhelpers": "2.1.11"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "com.unity.xr.openxr": {
+      "version": "1.18.0",
+      "depth": 0,
+      "source": "registry",
+      "dependencies": {
+        "com.unity.modules.xr": "1.0.0",
+        "com.unity.inputsystem": "1.6.3",
+        "com.unity.xr.core-utils": "2.3.0",
+        "com.unity.xr.management": "4.4.0",
+        "com.unity.modules.androidjni": "1.0.0",
+        "com.unity.xr.legacyinputhelpers": "2.1.2"
+      },
+      "url": "https://packages.unity.com"
+    },
+    "wu.yize.gsplat": {
+      "version": "https://github.com/wuyize25/gsplat-unity.git#a2bf458d6b16395e6570e9345f9f4408f92684b8",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.mathematics": "1.3.2"
+      },
+      "hash": "a2bf458d6b16395e6570e9345f9f4408f92684b8"
     },
     "com.unity.modules.accessibility": {
       "version": "1.0.0",
