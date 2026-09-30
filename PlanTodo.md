@@ -61,7 +61,7 @@ related: "TechPlan.md"
 - [x] 头显里能看到 splat(Single Pass Instanced,`worldlabs_test.spz`,2M 点)
 - [ ] 头显实测:Single Pass Instanced(默认)是否黑屏/双眼错位;不行再试多通道(OpenXR 设置里改 Render Mode)
 - [ ] 头显实测帧率:`full_res`(约 2M 点) vs `500k`,记录显卡型号
-- [ ] 坐标转换:在头显里用右 A 循环 `SourceCoordinates`,找出方向正确的一项(TechPlan 里预期是 RDF 或加 180° 旋转)
+- [x] 坐标转换:暂定 **RDF**(`worldlabs_test.spz` 方向正确);手调参数暂定 `metricScaleFactor=2`、`groundPlaneOffset=-1`,待有 `semantics_metadata` 后替换
 - [ ] 应用 `metric_scale_factor` 与 `ground_plane_offset`,使玩家站在地面上、尺度合理(需要 `semantics_metadata`;没有就先用手柄手调并记录数值)
 - [ ] 碰撞体 GLB:`SplatWorldLoader.LoadColliderAsync` 已写好,填入 `colliderGlbPath` 后验证站立/传送落点(需要匹配这个世界的 GLB)
 - [ ] 若 SPZ 解码异常,试 SPZ → PLY 走 `LoadFromPlyBytes` 备选(目前 SPZ 解码正常)

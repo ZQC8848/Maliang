@@ -158,8 +158,8 @@ MonoBehaviour:
   colliderGlbPath: 
   sourceCoordinates: 6
   alignment:
-    metricScaleFactor: 1
-    groundPlaneOffset: 0
+    metricScaleFactor: 2
+    groundPlaneOffset: 5
     extraEulerRotation: {x: 0, y: 0, z: 0}
   loader: {fileID: 582607917}
   hudCamera: {fileID: 391754863}
@@ -187,7 +187,7 @@ Transform:
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
-  m_ConstrainProportionsScale: 0
+  m_ConstrainProportionsScale: 1
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
