@@ -558,6 +558,10 @@ MonoBehaviour:
   hoverTiltBack: 12
   bobAmplitude: 0.012
   bobPeriod: 3.2
+  clearanceStep: 0.05
+  maxLiftUp: 0.6
+  maxShiftSide: 0.9
+  clearanceMargin: 0.02
 --- !u!65 &7510450318159257690
 BoxCollider:
   m_ObjectHideFlags: 0

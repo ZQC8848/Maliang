@@ -138,7 +138,7 @@ namespace Maliang.EditorTools
 
             float surfaceY = deskTop.max.y;
 
-            // Drawing spot, the scroll on it (starts rolled up in the middle and unrolls), and a rolled spare at the back
+            // Drawing spot (empty at the start) and a rolled scroll at the back of the desk, to be laid on it
             var stationGo = new GameObject("Scroll Station");
             float scrollZ = deskTop.min.z + ScrollFrontInset + ScrollSize.y * 0.5f;
             stationGo.transform.position = new Vector3(deskTop.center.x, surfaceY + 0.004f, scrollZ);
@@ -147,9 +147,8 @@ namespace Maliang.EditorTools
             station.scrollPrefab = scrollPrefab;
             station.head = head;
 
-            var ritual = PlaceScroll(scrollPrefab, "Scroll", stationGo.transform.position, Quaternion.identity, head, ScrollStartMode.UnrollOnStart, false, station);
-            var canvas = ritual.canvas;
-            station.active = ritual;
+            // The drawing spot starts empty: the player lays the rolled scroll from the back of the desk there to begin.
+            station.active = null;
 
             var spareSpot = new GameObject("Spare Spot").transform;
             spareSpot.SetParent(stationGo.transform, false);
@@ -170,7 +169,7 @@ namespace Maliang.EditorTools
             }
 
             // Brush, standing upright behind the paints, clear of the scroll roller and the inkstone
-            var pen = BuildBrush(canvas, new Vector3(rightX + 0.055f, surfaceY + 0.03f, deskTop.min.z + 0.06f + 2.2f * DishSpacing));
+            var pen = BuildBrush(null, new Vector3(rightX + 0.055f, surfaceY + 0.03f, deskTop.min.z + 0.06f + 2.2f * DishSpacing));
             pen.station = station; // paints on whichever scroll is on the desk
 
             // Tripo inkstone in place of the desk model's round 古砚 (desk left), lotus candle stand at the back right
@@ -178,8 +177,8 @@ namespace Maliang.EditorTools
             report.Add(BuildCandleStand(surfaceY));
 
             // Seals side by side at the front left, in front of the inkstone
-            BuildSeal("Seal 物 (Object)", SealType.Object, SealWu, SealObjectModel, canvas, ritual, new Vector3(SealObjectXZ.x, surfaceY, SealObjectXZ.y));
-            BuildSeal("Seal 境 (World)", SealType.World, SealJing, SealWorldModel, canvas, ritual, new Vector3(SealWorldXZ.x, surfaceY, SealWorldXZ.y));
+            BuildSeal("Seal 物 (Object)", SealType.Object, SealWu, SealObjectModel, null, null, new Vector3(SealObjectXZ.x, surfaceY, SealObjectXZ.y));
+            BuildSeal("Seal 境 (World)", SealType.World, SealJing, SealWorldModel, null, null, new Vector3(SealWorldXZ.x, surfaceY, SealWorldXZ.y));
             foreach (var seal in Object.FindObjectsByType<SealStamp>(FindObjectsInactive.Include)) seal.station = station;
 
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
@@ -189,7 +188,7 @@ namespace Maliang.EditorTools
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AddToBuildSettings(ScenePath);
-            report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, scroll at {ritual.transform.position}, spare at {spare.transform.position}, pen at {pen.transform.position}");
+            report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, drawing spot at {stationGo.transform.position}, rolled scroll at {spare.transform.position}, pen at {pen.transform.position}");
             return string.Join("\n", report);
         }
 
@@ -473,6 +472,7 @@ namespace Maliang.EditorTools
             canvas.displayMaterial = ScrollMaterial();
             canvas.BuildMesh(); // edit-mode preview (rebuilt at runtime); saved so the prefab keeps it
             var mf = canvasGo.GetComponent<MeshFilter>();
+            mf.sharedMesh.name = Path.GetFileNameWithoutExtension(ScrollQuadPath); // asset name must match its file
             mf.sharedMesh = SaveMeshAsset(mf.sharedMesh, ScrollQuadPath);
             var mr = canvasGo.GetComponent<MeshRenderer>();
             mr.sharedMaterial = canvas.displayMaterial;
