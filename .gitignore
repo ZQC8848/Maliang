@@ -1,4 +1,5 @@
-# Unity generated
+# Unity generated (patterns without a leading slash match in every Unity
+# project under this repo: ReferenceProject/, TripoHack-Maliang/My project/, ...)
 [Ll]ibrary/
 [Tt]emp/
 [Oo]bj/
@@ -7,15 +8,46 @@
 [Ll]ogs/
 [Uu]ser[Ss]ettings/
 [Mm]emoryCaptures/
+[Rr]ecordings/
+.utmp/
+*.log
+mono_crash.*
+sysinfo.txt
+
+# Blender / build outputs
+*.blend1
+*.blend1.meta
+*.apk
+*.aab
+*.unitypackage
+*.unitypackage.meta
+
+# IDE / generated solution files
 *.csproj
+*.unityproj
 *.sln
 *.suo
+*.tmp
 *.user
+*.userprefs
+*.DotSettings.user
 *.pidb
+*.pidb.meta
 *.booproj
+*.svd
+*.pdb
+*.pdb.meta
+*.mdb
+*.mdb.meta
+*.opendb
+*.VC.db
+ExportedObj/
+.consulo/
+.gradle/
 .vs/
 .idea/
 .vscode/
+[Aa]ssets/Plugins/Editor/JetBrains*
 
 # Secrets (see TechPlan §10)
 maliang.config.json
