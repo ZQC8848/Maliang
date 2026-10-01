@@ -12,6 +12,8 @@ namespace Maliang.Ritual
     /// Summoning without the API (the fake job a sealed scroll waits on; also applied to the scroll in progress):
     /// 1: succeeds   2: fails at the verdict (unrecognizable)   3: fails during generation (collapsed)
     /// 4: slow verdict (25 s), to see the fire wait at 40%.
+    /// Replay (the 10 s library burn) of whatever lies drawn on the desk, with a stand-in load:
+    /// 5: loads in 3 s   6: loads in 16 s (the fire waits in its embers)   7: files broken (faded).
     /// </summary>
     public class DeskDebugKeys : MonoBehaviour
     {
@@ -54,6 +56,22 @@ namespace Maliang.Ritual
             if (kb.digit2Key.wasPressedThisFrame) SetOutcome(FakeOutcome.FailAtVerdict, 6f);
             if (kb.digit3Key.wasPressedThisFrame) SetOutcome(FakeOutcome.FailAfterVerdict, 6f);
             if (kb.digit4Key.wasPressedThisFrame) SetOutcome(FakeOutcome.Success, 25f);
+            if (kb.digit5Key.wasPressedThisFrame) Replay(3f, false);
+            if (kb.digit6Key.wasPressedThisFrame) Replay(16f, false);
+            if (kb.digit7Key.wasPressedThisFrame) Replay(2f, true);
+        }
+
+        /// <summary>Turns the scroll lying on the desk into a replay (locked; rises by itself) with a stand-in load.</summary>
+        public void Replay(float loadSeconds, bool faded)
+        {
+            var active = Active;
+            if (active == null || (active.State != ScrollState.Unrolled && active.State != ScrollState.Rolled))
+            {
+                MaliangLog.Info("Debug", "Replay needs a scroll lying on the desk (not yet sealed).");
+                return;
+            }
+            active.BeginReplay(ReplayJob.Fake(loadSeconds, faded));
+            MaliangLog.Info("Debug", $"Replay: loads in {loadSeconds:F0}s{(faded ? ", then fails (faded)" : "")}");
         }
 
         /// <summary>Sets how fake summonings play out, and restarts the active scroll's job if it has not finished.</summary>

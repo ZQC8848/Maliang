@@ -35,6 +35,8 @@ namespace Maliang.EditorTools
         static float _failedAt = -1f, _stepTime;
         static string _dir;
         static FakeJobSettings _settings;
+        static float _replayLoad = -1f; // >= 0: replay with a stand-in load of this many seconds
+        static bool _replayFaded;
         static Camera _capture;
 
         [MenuItem("Maliang/Debug/Burn Test/Success (Play Mode)")]
@@ -45,21 +47,41 @@ namespace Maliang.EditorTools
         static void RunFailGeneration() => Run(FakeOutcome.FailAfterVerdict, 6f);
         [MenuItem("Maliang/Debug/Burn Test/Slow Verdict - Hold At 40% (Play Mode)")]
         static void RunSlowVerdict() => Run(FakeOutcome.Success, 25f);
+        [MenuItem("Maliang/Debug/Burn Test/Replay - Loads In 3 s (Play Mode)")]
+        static void RunReplay() => RunReplay(3f, false);
+        [MenuItem("Maliang/Debug/Burn Test/Replay - Slow Load, Embers (Play Mode)")]
+        static void RunReplaySlow() => RunReplay(16f, false);
+        [MenuItem("Maliang/Debug/Burn Test/Replay - Faded (Play Mode)")]
+        static void RunReplayFaded() => RunReplay(2f, true);
+
+        /// <summary>A replayed scroll (fixed 10 s burn) with a stand-in load of <paramref name="loadSeconds"/>.</summary>
+        public static void RunReplay(float loadSeconds, bool faded)
+        {
+            Start(new FakeJobSettings(), $"Replay_{loadSeconds:F0}s{(faded ? "_faded" : "")}");
+            _replayLoad = loadSeconds;
+            _replayFaded = faded;
+        }
 
         public static void Run(FakeOutcome outcome, float verdictDelay, float generationTime = 20f)
         {
+            Start(new FakeJobSettings { outcome = outcome, verdictDelay = verdictDelay, generationTime = generationTime },
+                $"{outcome}{(verdictDelay > 10f ? "_slow" : "")}");
+        }
+
+        static void Start(FakeJobSettings settings, string label)
+        {
             if (!Application.isPlaying) { Debug.LogWarning("[BurnTest] enter play mode first"); return; }
-            _settings = new FakeJobSettings { outcome = outcome, verdictDelay = verdictDelay, generationTime = generationTime };
+            _settings = settings;
+            _replayLoad = -1f;
             _step = Step.LayDown;
             _shot = _failShot = 0;
             _holdShot = false;
             _failedAt = -1f;
-            _dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "TestData", "Burn",
-                $"{System.DateTime.Now:HHmmss}_{outcome}{(verdictDelay > 10f ? "_slow" : "")}"));
+            _dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "TestData", "Burn", $"{System.DateTime.Now:HHmmss}_{label}"));
             Directory.CreateDirectory(_dir);
             EditorApplication.update -= Tick;
             EditorApplication.update += Tick;
-            Debug.Log($"[BurnTest] {outcome}, verdict {verdictDelay:F0}s, generation {generationTime:F0}s -> {_dir}");
+            Debug.Log($"[BurnTest] {label} -> {_dir}");
         }
 
         static void Next(Step s)
@@ -84,8 +106,12 @@ namespace Maliang.EditorTools
                 case Step.WaitUnrolled:
                     if (_scroll.State != ScrollState.Unrolled) return;
                     CanvasTestPainter.PaintMountainScene(_scroll.canvas, Object.FindAnyObjectByType<BrushPen>().CurrentStyle);
-                    FakeJob.Settings = _settings;
-                    _scroll.OnSealed(SealType.Object);
+                    if (_replayLoad >= 0f) _scroll.BeginReplay(ReplayJob.Fake(_replayLoad, _replayFaded)); // rises by itself
+                    else
+                    {
+                        FakeJob.Settings = _settings;
+                        _scroll.OnSealed(SealType.Object);
+                    }
                     _burn = _scroll.GetComponent<ScrollBurn>();
                     _pacer = _scroll.GetComponent<BurnPacer>();
                     Next(Step.WaitHover);
@@ -132,7 +158,7 @@ namespace Maliang.EditorTools
                         }
                         return;
                     }
-                    if (!_holdShot && _pacer != null && _pacer.Current == BurnPacer.Phase.Holding && t > 4f)
+                    if (!_holdShot && _pacer != null && (_pacer.Current == BurnPacer.Phase.Holding || _pacer.Current == BurnPacer.Phase.Embers) && t > 4f)
                     {
                         Capture($"hold_{Mathf.RoundToInt(_burn.Progress * 100):00}.png");
                         _holdShot = true;
@@ -144,7 +170,7 @@ namespace Maliang.EditorTools
                     }
                     if (_burn.IsBurnedAway)
                     {
-                        Debug.Log($"[BurnTest] burned away after {t:F1}s; frames in {_dir}");
+                        Debug.Log($"[BurnTest] burned away {t:F1}s after catching; frames in {_dir}");
                         Stop();
                     }
                     break;

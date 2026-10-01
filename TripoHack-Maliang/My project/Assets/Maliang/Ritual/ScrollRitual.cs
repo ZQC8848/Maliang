@@ -129,10 +129,16 @@ namespace Maliang.Ritual
         /// <summary>The summoning job started at the seal (what the burn waits on).</summary>
         public IBurnJob Job { get; set; }
 
+        /// <summary>
+        /// Replaying a library work (Phase3Design 8.5, D18): the drawing is locked (no brush, no seal) and the scroll
+        /// rises by itself once it has unrolled; its burn is the fixed replay burn.
+        /// </summary>
+        public bool IsReplay { get; private set; }
+
         Transform Root => scrollRoot != null ? scrollRoot : canvas.transform;
         Transform Head => head != null ? head : (Camera.main != null ? Camera.main.transform : null);
 
-        public bool CanSeal => State == ScrollState.Unrolled && canvas.InkCoverage >= minInkCoverage;
+        public bool CanSeal => State == ScrollState.Unrolled && !IsReplay && canvas.InkCoverage >= minInkCoverage;
         /// <summary>Sealed and hovering (or held after hovering): a candle can set it alight.</summary>
         public bool CanIgnite => State == ScrollState.Levitating && IsHovering;
         /// <summary>True once the scroll has left the desk: hovering after its seal, or further on in the ritual.</summary>
@@ -187,15 +193,36 @@ namespace Maliang.Ritual
             yield return unroll.Play(1f);
             _unrolling = null;
             State = ScrollState.Unrolled;
-            canvas.InputLocked = false;
-            MaliangLog.Info("Ritual", "Scroll unrolled.");
+            canvas.InputLocked = IsReplay;
+            MaliangLog.Info("Ritual", IsReplay ? "Replay scroll unrolled; rising by itself." : "Scroll unrolled.");
             Unrolled?.Invoke();
+            if (IsReplay) Levitate();
+        }
+
+        /// <summary>
+        /// Makes this scroll a replay of a library work, loaded by <paramref name="job"/> once it catches fire: locked,
+        /// and it rises by itself as soon as it lies unrolled (now, if it already does). The drawing and seal layers
+        /// are the library's business (InkCanvas.LoadLayers, Phase 5).
+        /// </summary>
+        public void BeginReplay(ReplayJob job, SealType seal = SealType.Object)
+        {
+            IsReplay = true;
+            Job = job;
+            Seal = seal;
+            canvas.InputLocked = true;
+            if (State == ScrollState.Unrolled) Levitate();
+        }
+
+        void Levitate()
+        {
+            State = ScrollState.Levitating;
+            _rise = StartCoroutine(Rise());
         }
 
         /// <summary>Called by a seal after it printed. Locks the drawing and starts the rise.</summary>
         public void OnSealed(SealType type)
         {
-            if (State != ScrollState.Unrolled) return;
+            if (State != ScrollState.Unrolled || IsReplay) return;
             Seal = type;
             canvas.InputLocked = true;
             State = ScrollState.Levitating;
@@ -445,7 +472,9 @@ namespace Maliang.Ritual
             if (_rise != null) { StopCoroutine(_rise); _rise = null; }
             if (_failing != null) { StopCoroutine(_failing); _failing = null; }
             if (_message != null) { _message.Hide(); _message = null; }
+            if (Job is ReplayJob replay) replay.Cancel();
             Job = null;
+            IsReplay = false;
             var burn = GetComponent<ScrollBurn>();
             if (burn != null) burn.ResetBurn();
             var pacer = GetComponent<BurnPacer>();

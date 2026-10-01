@@ -13,6 +13,9 @@ namespace Maliang.Ritual
     ///   creep so it never looks stuck) and burns to the end once the model is ready.
     /// - Verdict fail, or a technical failure later: the failure sequence (<see cref="ScrollRitual.Fail"/>), once the
     ///   fire has had a moment to catch.
+    /// Replaying a library work (<see cref="ReplayJob"/>, Phase3Design 8.5): a fixed <see cref="replayDuration"/> with no
+    /// hold point; loading starts as the fire catches, and if it is not done by the end the fire waits in its last
+    /// embers. A failed load is the failure sequence (faded).
     /// Without a job it simply burns at the normal pace.
     /// </summary>
     [RequireComponent(typeof(ScrollBurn))]
@@ -34,7 +37,13 @@ namespace Maliang.Ritual
         [Tooltip("A failure shows only after this much has burned, so the fire is seen to catch first.")]
         public float minBurnBeforeFail = 0.06f;
 
-        public enum Phase { Idle, Burning, Holding, Loading, Finishing, Failed }
+        [Header("Replay (library)")]
+        [Tooltip("Seconds a replayed scroll takes to burn (no API, no hold point).")]
+        public float replayDuration = 10f;
+        [Tooltip("Burned share where a replay waits in its embers if the files are still loading.")]
+        [Range(0f, 1f)] public float emberPoint = 0.97f;
+
+        public enum Phase { Idle, Burning, Holding, Loading, Embers, Finishing, Failed }
         public Phase Current { get; private set; } = Phase.Idle;
 
         float _target, _creep;
@@ -55,6 +64,7 @@ namespace Maliang.Ritual
         {
             _target = 0f;
             _creep = 0f;
+            if (ritual.Job is ReplayJob replay) replay.BeginLoading(); // the files load while it burns
             Set(Phase.Burning);
         }
 
@@ -73,7 +83,36 @@ namespace Maliang.Ritual
 
             var job = ritual.Job;
             float cap;
-            if (job == null)
+            float duration = baseDuration;
+            float band = slowBand;
+            if (job is ReplayJob)
+            {
+                // Fixed length, no hold point; embers at the very end if the files are not loaded yet.
+                duration = replayDuration;
+                band = 0.03f;
+                if (job.Done && !job.Succeeded)
+                {
+                    if (burn.Progress >= minBurnBeforeFail)
+                    {
+                        Set(Phase.Failed);
+                        burn.Holding = false;
+                        ritual.Fail(job.Reason ?? FailReason.Faded);
+                        return;
+                    }
+                    cap = minBurnBeforeFail + 0.02f;
+                }
+                else if (job.Done)
+                {
+                    cap = 1f;
+                    Set(Phase.Finishing);
+                }
+                else
+                {
+                    cap = emberPoint;
+                    Set(_target >= emberPoint - 0.01f ? Phase.Embers : Phase.Burning);
+                }
+            }
+            else if (job == null)
             {
                 cap = 1f;
                 Set(Phase.Finishing);
@@ -111,10 +150,10 @@ namespace Maliang.Ritual
 
             // Normal pace, easing into the limit so the fire settles into a smoulder rather than stopping dead.
             float room = cap - _target;
-            float ease = cap >= 1f ? 1f : Mathf.Clamp01(room / Mathf.Max(0.001f, slowBand));
-            _target = Mathf.Min(cap, _target + Time.deltaTime / Mathf.Max(0.1f, baseDuration) * ease);
+            float ease = cap >= 1f ? 1f : Mathf.Clamp01(room / Mathf.Max(0.001f, band));
+            _target = Mathf.Min(cap, _target + Time.deltaTime / Mathf.Max(0.1f, duration) * ease);
             burn.TargetProgress = _target;
-            burn.Holding = Current == Phase.Holding;
+            burn.Holding = Current == Phase.Holding || Current == Phase.Embers;
         }
 
         void Set(Phase phase)
@@ -124,6 +163,7 @@ namespace Maliang.Ritual
             string what = phase switch
             {
                 Phase.Holding => $"holding at {holdPoint:P0}, waiting for the verdict",
+                Phase.Embers => "embers: waiting for the saved work to load",
                 Phase.Loading => "verdict ok: the fire follows the generation",
                 Phase.Finishing => "burning to the end",
                 Phase.Failed => "the job failed",
