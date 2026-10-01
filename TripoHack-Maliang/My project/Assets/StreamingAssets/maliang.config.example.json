@@ -1,9 +1,41 @@
 {
   "mode": "online",
-  "worldLabs": { "apiKey": "", "model": "marble-1.1", "splat": "full_res" },
-  "tripo": { "apiKey": "" },
-  "vision": { "provider": "openai", "apiKey": "", "model": "" },
-  "imageGen": { "enabled": true },
-  "limits": { "maxGenerationsPerSession": 6, "worldTimeoutSec": 600, "objectTimeoutSec": 240 },
-  "fallback": { "enabled": true, "fastMode": false }
+  "worldLabs": {
+    "apiKey": "",
+    "model": "marble-1.1",
+    "splat": "full_res"
+  },
+  "tripo": {
+    "apiKey": "",
+    "creatureModel": "P1-20260311",
+    "staticModel": "v3.1-20260211"
+  },
+  "vision": {
+    "provider": "openai",
+    "apiKey": "",
+    "model": "gpt-6.1-sol"
+  },
+  "imageGen": {
+    "enabled": true,
+    "model": "gpt-image-2.5-sunburst"
+  },
+  "sound": {
+    "provider": "elevenlabs",
+    "apiKey": "",
+    "enabled": true
+  },
+  "limits": {
+    "maxGenerationsPerSession": 6,
+    "worldTimeoutSec": 600,
+    "objectTimeoutSec": 240
+  },
+  "library": {
+    "enabled": true,
+    "perDrawer": 6,
+    "maxDiskMB": 4096
+  },
+  "fallback": {
+    "enabled": true,
+    "fastMode": false
+  }
 }

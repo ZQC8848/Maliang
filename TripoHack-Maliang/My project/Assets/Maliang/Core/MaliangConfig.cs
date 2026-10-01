@@ -5,9 +5,19 @@ using UnityEngine;
 namespace Maliang.Core
 {
     [Serializable] public class WorldLabsConfig { public string apiKey = ""; public string model = "marble-1.1"; public string splat = "full_res"; }
-    [Serializable] public class TripoConfig { public string apiKey = ""; }
-    [Serializable] public class VisionConfig { public string provider = "openai"; public string apiKey = ""; public string model = ""; }
-    [Serializable] public class ImageGenConfig { public bool enabled = true; }
+    [Serializable]
+    public class TripoConfig
+    {
+        public string apiKey = "";
+        public string creatureModel = "P1-20260311";   // animated creatures (Phase3Design D5)
+        public string staticModel = "v3.1-20260211";   // everything else
+    }
+    [Serializable] public class VisionConfig { public string provider = "openai"; public string apiKey = ""; public string model = "gpt-6.1-sol"; }
+    /// <summary>Image refine before Tripo; uses the vision (OpenAI) key.</summary>
+    [Serializable] public class ImageGenConfig { public bool enabled = true; public string model = "gpt-image-2.5-sunburst"; }
+    [Serializable] public class SoundConfig { public string provider = "elevenlabs"; public string apiKey = ""; public bool enabled = true; }
+    /// <summary>Local artwork library (Phase3Design section 8).</summary>
+    [Serializable] public class LibraryConfig { public bool enabled = true; public int perDrawer = 6; public int maxDiskMB = 4096; }
     [Serializable]
     public class LimitsConfig
     {
@@ -32,6 +42,8 @@ namespace Maliang.Core
         public TripoConfig tripo = new TripoConfig();
         public VisionConfig vision = new VisionConfig();
         public ImageGenConfig imageGen = new ImageGenConfig();
+        public SoundConfig sound = new SoundConfig();
+        public LibraryConfig library = new LibraryConfig();
         public LimitsConfig limits = new LimitsConfig();
         public FallbackConfig fallback = new FallbackConfig();
 
@@ -80,6 +92,7 @@ namespace Maliang.Core
             MaliangLog.AddSecret(worldLabs.apiKey);
             MaliangLog.AddSecret(tripo.apiKey);
             MaliangLog.AddSecret(vision.apiKey);
+            MaliangLog.AddSecret(sound.apiKey);
         }
     }
 }

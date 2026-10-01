@@ -1,0 +1,161 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "reason",
+    "seen",
+    "subject",
+    "category",
+    "refine_prompt",
+    "model_prompt",
+    "animate",
+    "sound",
+    "size_m"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "fail"
+      ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "unrecognizable",
+        "too_abstract",
+        "nearly_blank",
+        "crowded",
+        null
+      ]
+    },
+    "seen": {
+      "type": "string"
+    },
+    "subject": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "category": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "biped",
+        "quadruped",
+        "hexapod",
+        "octopod",
+        "serpentine",
+        "aquatic",
+        "avian",
+        "object",
+        "plant",
+        "scenery",
+        null
+      ]
+    },
+    "refine_prompt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "model_prompt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "animate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wanted",
+        "rig_type",
+        "animations"
+      ],
+      "properties": {
+        "wanted": {
+          "type": "boolean"
+        },
+        "rig_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "animations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "sound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wanted",
+        "prompt",
+        "kind",
+        "trigger",
+        "duration_s"
+      ],
+      "properties": {
+        "wanted": {
+          "type": "boolean"
+        },
+        "prompt": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "oneshot",
+            "loop",
+            null
+          ]
+        },
+        "trigger": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "enum": [
+            "on_spawn",
+            "on_grab",
+            "loop",
+            null
+          ]
+        },
+        "duration_s": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      }
+    },
+    "size_m": {
+      "type": [
+        "number",
+        "null"
+      ]
+    }
+  }
+}

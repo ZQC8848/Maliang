@@ -120,14 +120,14 @@ related: "TechPlan.md, Phase3Design.md"
 > 完整设计见 [Phase3Design.md](Phase3Design.md)(决定 D1~D21)。游戏内文字一律英文。
 
 **先做的实测(Phase3Design 第 13 节):**
-- [ ] glTFast 运行时载入带骨骼动画的 Tripo GLB 并播放
-- [ ] P1-20260311 与 v3.1-20260211 的水墨风格还原度、面数、VR 帧耗对比
-- [ ] gpt-image-2.5-sunburst 精修 5 张测试画:主体与水墨风格是否保留、姿势要求是否遵守
-- [ ] 识别尺度:20 张测试画(清楚 10、写意 5、乱涂 5),清楚和写意的不失败,乱涂的全部失败
+- [x] glTFast 运行时载入带骨骼动画的 Tripo GLB 并播放(马、道士通过)
+- [x] P1-20260311 与 v3.1-20260211 的模型质量、面数对比:维持生物 P1、静态 v3.1 限面数(模型不需要水墨风格)
+- [ ] gpt-image-2.5-sunburst 精修 5 张测试画:主体与颜色特征是否保留、姿势要求是否遵守(精修图不需要水墨风格;已测 2 张)
+- [x] 识别尺度:20 张合成测试画,清楚和写意 15 张全部成功,乱涂 3/5 失败(另 2 张被宽松解读);之后用 VR 真实画补测
 - [ ] Windows 打包版运行时解码 ElevenLabs 的 MP3
 
 **实现:**
-- [ ] 用我们的 OpenAI key 查 `/v1/models`,定下 GPT 文本模型型号(D10)
+- [x] 用我们的 OpenAI key 查 `/v1/models`,定下 GPT 文本模型型号(D10):`gpt-6.1-sol`
 - [ ] `Http`:超时、有限次指数退避重试、错误归类到 `FailReason`(unreachable / exhausted / forbidden / collapsed)
 - [ ] `VisionClient`:水墨 PNG + 印章类型 + 能力表 → 严格结构化输出 `VisionPlan`(`ok` / `fail` 二选一);提示词放 `StreamingAssets/Prompts/vision_object.txt`;按允许列表校验返回内容
 - [ ] `ImageRefineClient`:`/v1/images/edits` + `gpt-image-2.5-sunburst`,出错跳过
