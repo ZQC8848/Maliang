@@ -5,6 +5,7 @@
     "status",
     "reason",
     "seen",
+    "confidence",
     "subject",
     "category",
     "refine_prompt",
@@ -36,6 +37,9 @@
     },
     "seen": {
       "type": "string"
+    },
+    "confidence": {
+      "type": "number"
     },
     "subject": {
       "type": [

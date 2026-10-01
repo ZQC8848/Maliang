@@ -13,7 +13,12 @@ namespace Maliang.Core
         public string staticModel = "v3.1-20260211";   // everything else
         public int staticFaceLimit = 50000;             // v3.1 is ~1.5M faces by default, far too heavy for VR
     }
-    [Serializable] public class VisionConfig { public string provider = "openai"; public string apiKey = ""; public string model = "gpt-6.1-sol"; }
+    [Serializable] public class VisionConfig
+    {
+        public string provider = "openai"; public string apiKey = ""; public string model = "gpt-6.1-sol";
+        /// <summary>Readings below this confidence fail as unrecognizable (strictness; the prompt asks for 0.6 too).</summary>
+        public float minConfidence = 0.6f;
+    }
     /// <summary>Image refine before Tripo; uses the vision (OpenAI) key.</summary>
     [Serializable] public class ImageGenConfig { public bool enabled = true; public string model = "gpt-image-2.5-sunburst"; }
     [Serializable] public class SoundConfig { public string provider = "elevenlabs"; public string apiKey = ""; public bool enabled = true; }

@@ -4,16 +4,20 @@ You receive one image: the ink drawing, cropped to the painted area. It was pain
 
 ## 1. Recognise the subject
 
-- Find the single main subject the drawing most plausibly shows. Ink painting is suggestive: a few strokes can be a mountain, a bird, a boat or a person. Prefer a bold, plausible reading over failing. If a reasonable person could say "it looks like a ...", that is your answer.
-- Return status "fail" ONLY in these cases, with the matching reason:
-  - "unrecognizable": the marks do not suggest any nameable thing.
-  - "too_abstract": only strokes or texture, no subject at all.
+Summoning costs real magic, so be a strict judge. Only summon what the drawing actually shows.
+
+- Look for evidence, not possibilities. Name the subject only if the strokes contain recognisable features of it: a silhouette or outline that matches its shape, and parts in plausible places (a head, legs, tail or wings for a creature; a hull and a sail or mast for a boat; a body, handle and spout for a teapot). Simple, childish or loose drawings are fine when those features are there.
+- Do NOT read a subject into marks that merely could be one. Random zigzags, crossing lines, loops, scribbles and blots are NOT mountains, waves, boats, grass or clouds just because those shapes are vague. Ask yourself: would most people, shown this drawing without any hint, name the same thing? If not, fail.
+- "confidence": your honest probability (0 to 1) that a typical person would name the same subject without a hint. Clear drawings are 0.8 to 1; loose but readable sketches 0.6 to 0.8; anything you had to guess is below 0.5. If your confidence is below 0.6, return status "fail".
+- Return status "fail" with the matching reason:
+  - "unrecognizable": the marks have some structure but do not clearly show any nameable thing, or you would have to guess.
+  - "too_abstract": only strokes, scribbles or texture, no subject at all.
   - "nearly_blank": there is too little ink to read anything.
   - "crowded": several different shapes are tangled together and none can be taken as the one main subject.
-- A simple or childish drawing is NOT a failure. A drawing of several similar things (three fish) is NOT crowded: summon one of them.
+- A drawing of several similar things (three fish) is NOT crowded: summon one of them.
 - "seen": always describe in one short sentence what is literally on the paper (for the developers' log).
 
-When status is "fail", set subject, category, refine_prompt, model_prompt and size_m to null, animate.wanted to false with rig_type null and animations empty, and sound.wanted to false with all its other fields null.
+When status is "fail", set subject, category, refine_prompt, model_prompt and size_m to null, animate.wanted to false with rig_type null and animations empty, and sound.wanted to false with all its other fields null. Still give your confidence for the best guess.
 
 ## 2. Classify
 

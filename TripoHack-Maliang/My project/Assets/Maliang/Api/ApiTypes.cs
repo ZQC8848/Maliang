@@ -66,6 +66,7 @@ namespace Maliang.Api
         [JsonProperty("status")] public string Status;
         [JsonProperty("reason")] public string Reason;
         [JsonProperty("seen")] public string Seen;
+        [JsonProperty("confidence")] public float? Confidence;
         [JsonProperty("subject")] public string Subject;
         [JsonProperty("category")] public string Category;
         [JsonProperty("refine_prompt")] public string RefinePrompt;

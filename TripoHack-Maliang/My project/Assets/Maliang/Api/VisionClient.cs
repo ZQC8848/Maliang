@@ -64,7 +64,7 @@ namespace Maliang.Api
             var plan = JsonConvert.DeserializeObject<VisionPlan>(text);
             Validate(plan);
             MaliangLog.Info("Vision", $"{plan.Status} in {Time.realtimeSinceStartup - started:F1}s: " +
-                (plan.Ok ? $"{plan.Subject} [{plan.Category}]" : $"{plan.Reason}") + $" (seen: {plan.Seen})");
+                (plan.Ok ? $"{plan.Subject} [{plan.Category}]" : $"{plan.Reason}") + $" @ {plan.Confidence:F2} (seen: {plan.Seen})");
             return plan;
         }
 
@@ -88,6 +88,14 @@ namespace Maliang.Api
         public void Validate(VisionPlan plan)
         {
             if (!plan.Ok) return;
+            float min = _config.vision.minConfidence;
+            if ((plan.Confidence ?? 1f) < min)
+            {
+                MaliangLog.Info("Vision", $"'{plan.Subject}' at confidence {plan.Confidence:F2} < {min:F2}: unrecognizable");
+                plan.Status = "fail";
+                plan.Reason = "unrecognizable";
+                return;
+            }
             var cat = Capabilities.Get(plan.Category);
             var anim = plan.Animate;
             if (anim.Wanted)

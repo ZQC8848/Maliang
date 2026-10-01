@@ -14,7 +14,8 @@
   "vision": {
     "provider": "openai",
     "apiKey": "",
-    "model": "gpt-6.1-sol"
+    "model": "gpt-6.1-sol",
+    "minConfidence": 0.6
   },
   "imageGen": {
     "enabled": true,

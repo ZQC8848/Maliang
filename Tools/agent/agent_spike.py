@@ -127,6 +127,11 @@ def validate(plan):
     notes = []
     if plan["status"] != "ok":
         return notes
+    min_conf = CFG["vision"].get("minConfidence", 0.6)
+    if plan.get("confidence", 1.0) < min_conf:
+        notes.append(f"'{plan['subject']}' at confidence {plan['confidence']:.2f} < {min_conf}: unrecognizable")
+        plan["status"], plan["reason"] = "fail", "unrecognizable"
+        return notes
     cat = caps.get(plan.get("category") or "", {})
     anim = plan["animate"]
     if anim["wanted"]:
@@ -183,7 +188,7 @@ def cmd_plan(paths):
         usage = data.get("usage", {})
         anim = plan["animate"]
         snd = plan["sound"]
-        print(f"{name}: {plan['status']:4} {dt:5.1f}s  "
+        print(f"{name}: {plan['status']:4} {dt:5.1f}s c={plan.get('confidence', 0):.2f}  "
               + (f"reason={plan['reason']}  seen='{plan['seen']}'" if plan["status"] == "fail" else
                  f"{plan['subject']} [{plan['category']}] anim={anim['animations'] if anim['wanted'] else '-'} "
                  f"sound={(snd['kind'] + '/' + snd['trigger'] + ': ' + snd['prompt']) if snd['wanted'] else '-'} size={plan['size_m']}")
