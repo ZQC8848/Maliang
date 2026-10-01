@@ -3,7 +3,7 @@ Type: PlanTodo
 project: Maliang 马良
 status: 未开工
 date: 2026-09-30
-related: "TechPlan.md"
+related: "TechPlan.md, Phase3Design.md"
 ---
 
 # Maliang 分阶段执行清单
@@ -19,7 +19,7 @@ related: "TechPlan.md"
 | 0 | — | 工程与依赖就绪 | — |
 | 1 | M0 | **Splat Spike**:头显里看到生成的世界(最大风险先验证) | 0 |
 | 2 | M1 | 画 + 印 + 升空 | 0 |
-| 3 | M2 | 「物」API 客户端 | 0(可与 1、2 并行) |
+| 3 | M2 | 「物」AI 生成管线:看图、精修、建模、绑骨动画、声音、失败判定(设计见 [Phase3Design.md](Phase3Design.md)) | 0(可与 1、2 并行) |
 | 4 | M3 | 烧:燃烧演出(假进度) | 2 |
 | 5 | M4 | 「物」全流程闭环 | 3、4 |
 | 6 | M5 | 「境」全流程 | 1、5 |
@@ -115,18 +115,32 @@ related: "TechPlan.md"
 
 ---
 
-## 阶段 3(M2):「物」API 客户端(可与阶段 1、2 并行)
+## 阶段 3(M2):「物」AI 生成管线(可与阶段 1、2 并行)
 
-- [ ] `Http` 基础层:超时、指数退避重试(有限次)、错误分类(网络/鉴权/额度/内容/未知)
-- [ ] `GenerationJob` 统一状态机:`Kind`、`Stage`、`Progress`、`Result`、`Error`、可取消
-- [ ] `VisionClient`:画作 PNG → VLM → 物体描述与 Object Prompt(provider 抽象,提示词放 `StreamingAssets/Prompts/vision_object.txt`)
-- [ ] `ImageGenClient`(可选):生成干净背景参考图,失败则跳过
-- [ ] `TripoClient`:上传 → 建任务 → 轮询 → **立即下载** GLB(链接有效期短);**先核对官方文档,TechPlan 中端点细节尚未核实**
-- [ ] 编辑器脚本或命令行入口,便于不进头显直接测试:一张画 → 一个 GLB
-- [ ] `GlbLoader`:glTFast 运行时加载 + 尺度归一化 + 碰撞体 + `XRGrabInteractable`
+> 完整设计见 [Phase3Design.md](Phase3Design.md)(决定 D1~D21)。游戏内文字一律英文。
+
+**先做的实测(Phase3Design 第 13 节):**
+- [ ] glTFast 运行时载入带骨骼动画的 Tripo GLB 并播放
+- [ ] P1-20260311 与 v3.1-20260211 的水墨风格还原度、面数、VR 帧耗对比
+- [ ] gpt-image-2.5-sunburst 精修 5 张测试画:主体与水墨风格是否保留、姿势要求是否遵守
+- [ ] 识别尺度:20 张测试画(清楚 10、写意 5、乱涂 5),清楚和写意的不失败,乱涂的全部失败
+- [ ] Windows 打包版运行时解码 ElevenLabs 的 MP3
+
+**实现:**
+- [ ] 用我们的 OpenAI key 查 `/v1/models`,定下 GPT 文本模型型号(D10)
+- [ ] `Http`:超时、有限次指数退避重试、错误归类到 `FailReason`(unreachable / exhausted / forbidden / collapsed)
+- [ ] `VisionClient`:水墨 PNG + 印章类型 + 能力表 → 严格结构化输出 `VisionPlan`(`ok` / `fail` 二选一);提示词放 `StreamingAssets/Prompts/vision_object.txt`;按允许列表校验返回内容
+- [ ] `ImageRefineClient`:`/v1/images/edits` + `gpt-image-2.5-sunburst`,出错跳过
+- [ ] `TripoClient`:上传 → 建模 → 轮询 → 立即下载;rig-check(免费)→ rig(人形 v1.0、其他 v2.5)→ retarget(烘焙动画、原地播放)
+- [ ] 绑骨把关:GPT「该不该动」×预检「能不能动」;鸟类不绑骨;绑骨或套动作出错退回静态模型
+- [ ] `SoundClient`:ElevenLabs `eleven_text_to_sound_v2`,和建模并行,出错就无声(需要 ElevenLabs key)
+- [ ] `ObjectAgent` + `ObjectJob`:编排各步骤、并行声音、结果判定、失败归类;盖章时启动
+- [ ] `ObjectSpawner`:载入 GLB、统一尺寸、可抓取、播放动画或 `ProceduralMotion`(静态浮动 / 鸟类飞行)、声音触发(化形时 / 被抓时 / 循环)
+- [ ] `maliang.config.json` 新增 `sound`、`library` 配置段,`imageGen` 与 `tripo` 加模型字段
+- [ ] 编辑器测试入口:选一张 PNG,不进头显跑完整条管线,产物写到 `TestData/Agent/`
 - [ ] 会话内生成次数限额
 
-**验收:** 一张画得到可加载、可抓取的 GLB;失败有重试与分类;超时可控。
+**验收:** 画清楚的人、马、鱼各自得到会动的物体;画鹤得到带程序飞行的静态模型;画灯笼得到静态物体;至少一个有合适的声音;乱涂的画返回 `fail`;各类失败都能正确归类。
 
 ---
 
@@ -134,27 +148,38 @@ related: "TechPlan.md"
 
 - [ ] Burn / Dissolve Shader:采样合成结果(纸 × 墨 + 印),`_BurnProgress` 控制;**燃烧起点取火焰接触点的卷轴 UV**
 - [ ] 火焰粒子、灰烬、火星、环境光随进度增强
-- [ ] 可抓取烛火:烛台/蜡烛模型 + 火焰触发体;放下后回到桌边
+- [x] 可抓取烛台:莲花烛台 + 红烛 + 火焰粒子与闪烁光源,放下后回到桌边
+- [ ] 火焰触发体(`CandleFlame.Tip` 已预留)
 - [ ] 点燃判定:卷轴处于 `Levitating` + 火焰持续接触约 0.3~0.5 秒
 - [ ] 卷轴状态机落地:`Rolled → Unrolled → Levitating → Burning → Materializing → Done/Failed`
 - [ ] 虚拟进度器:单调不减;按 TechPlan §7.2 分阶段预算;主生成阶段渐近曲线;真实完成后快进
 - [ ] 「境」用里程碑事件(火势分批加大、卷轴分批脱落、环境音变化)
 - [ ] 先用**假计时器**驱动完整燃烧演出
+- [ ] 燃烧等待点:烧到 40% 时 GPT 结果未到就放慢火势、停住等待;成功继续,失败转失败演出(Phase3Design D12)
+- [ ] 回放节奏:固定 10 秒燃烧,末尾余烬状态等待本地载入完成(Phase3Design 8.5)
+- [ ] 失败演出(Phase3Design 第 7 节):火势停滞冷却 → 魔力消失 → 落地 → 英文提示语;`Burning → Failed`;释放悬停区
+- [ ] 残卷:物理刚体、可捡可扔、约 12 秒后化灰销毁
+- [ ] 失败演出用的预制音效:火苗熄灭、泄气、落地闷响
+- [ ] TextMeshPro 拉丁衬线字体的世界空间提示文字(不引入中文字体)
 
-**验收:** 视觉上进度与阶段吻合;无论假进度提前或延迟完成,演出都不突兀。
+**验收:** 视觉上进度与阶段吻合;无论假进度提前或延迟完成,演出都不突兀;失败演出完整,残卷能扔、会化灰。
 
 ---
 
 ## 阶段 5(M4):「物」全流程闭环
 
-- [ ] 点燃 → `GenerationJob` 启动 → 导出 Ink PNG → Vision → (参考图) → Tripo → 下载 GLB
-- [ ] `GenerationJob` 进度驱动 `_BurnProgress`
-- [ ] 燃尽处化形:GLB 出现在卷轴悬浮位置,可伸手抓取
+- [ ] 盖章 → `ObjectJob` 启动 → GPT 看图;点燃后按结果走成功或失败;成功则精修 → Tripo → 绑骨动画,声音并行
+- [ ] `ObjectJob` 进度驱动 `_BurnProgress`(过了 40% 等待点之后)
+- [ ] 燃尽处化形:GLB 出现在卷轴悬浮位置,可伸手抓取,动画和声音正常
+- [ ] 作品库写入(Phase3Design 第 8 节):盖章时存墨迹层和印章层到临时目录,成功后整体改名为正式目录并更新索引;失败删除临时目录;声音晚到时补写
+- [ ] `LibraryDrawer`:按索引在左抽屉(物)/右抽屉(境)生成回放卷轴,各显示最新 6 卷;红 / 青丝带与印章纸签区分;新作品到来时补一卷
+- [ ] 回放模式:放到画画位 → 展开显示原画和原印章(`InkCanvas.LoadLayers`)→ 锁定作画与盖印 → 自动浮空 → 点燃烧 10 秒 → 载入本地 GLB、动画、声音并化形 → 卷轴回到抽屉原位
+- [ ] 作品文件损坏或丢失时走失败演出,提示语 `faded`
 - [ ] 失败路径:重试 → 仍失败则进入兜底(阶段 7 前先用一个内置模型顶替)
 - [ ] 全流程手测 10 次,记录耗时与失败率
 - [ ] (加分项)Tripo 多视角参考图,不阻塞首版
 
-**验收:** 画 → 盖「物」印 → 点燃 → 等待 → 拿到自己画的东西,全流程打通。
+**验收:** 画 → 盖「物」印 → 点燃 → 等待 → 拿到自己画的东西,全流程打通;重启游戏后作品仍在左抽屉里,回放结果和当初一致。
 
 ---
 
@@ -169,6 +194,7 @@ related: "TechPlan.md"
 - [ ] 进入世界时隐藏/卸载桌面房间,避免叠加
 - [ ] 点数档位可配置(`full_res` / `500k`)
 - [ ] 验证碰撞体是否含在生成结果内、账单与计费
+- [ ] 「境」作品写入作品库(splat、碰撞体、对齐参数、语义信息),右抽屉回放后进入同一个世界;实测 splat 体积并定 `library.maxDiskMB` 默认值
 
 **验收:** 玩家可站在生成的世界里移动,并能回到桌面。
 
@@ -176,7 +202,7 @@ related: "TechPlan.md"
 
 ## 阶段 7(M6):兜底、快速模式、桌面模式、打磨
 
-- [ ] 预生成 3~6 组资源(剑、龙、山、城堡等)放入 `StreamingAssets/Fallback/` 并写 `meta.json`(关键词、类型、尺度、对齐)
+- [ ] 预生成 3~6 组资源(剑、龙、山、城堡等),直接用作品库格式放入 `StreamingAssets/Library/`(Phase3Design 8.8),首次启动抽屉里就有卷轴
 - [ ] `FallbackMatcher`:VLM 关键词匹配 → 退回同类型随机
 - [ ] 触发降级:API 失败 / 额度耗尽 / 断网 / 无密钥 / 超时 / 限额;演出保持一致
 - [ ] 快速体验模式:「境」直接用预生成结果 + 缩短燃烧
@@ -209,4 +235,5 @@ related: "TechPlan.md"
 
 - [ ] 每个阶段结束在 `.ai/` 或本文档记录实测数据与决策(尤其是阶段 1 的头显结果)
 - [ ] 每完成一个阶段提交一次,并及时回写 TechPlan 中已被证伪或已变化的假设
-- [ ] 待确认项(TechPlan §14):兜底内容清单、VLM 服务选型、评委是否有头显、发布渠道、是否首版做 Tripo 多视角
+- [ ] 待确认项(TechPlan §14):兜底内容清单、评委是否有头显、发布渠道、是否首版做 Tripo 多视角(VLM 已定为 OpenAI,见 Phase3Design)
+- [ ] 作品的删除方式(Phase3Design 第 15 节,尚无设计)
