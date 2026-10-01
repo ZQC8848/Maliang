@@ -107,7 +107,12 @@ namespace Maliang.Ritual
         /// <summary>Testing / new round: clears away the earlier scrolls and resets the active one.</summary>
         public void ResetAll()
         {
-            foreach (var r in _retired) if (r != null) Destroy(r.gameObject);
+            foreach (var r in _retired)
+            {
+                if (r == null) continue;
+                r.Discarding = true;
+                Destroy(r.gameObject);
+            }
             _retired.Clear();
             if (active != null) active.ResetScroll();
         }

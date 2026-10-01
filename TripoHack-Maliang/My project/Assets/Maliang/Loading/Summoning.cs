@@ -29,7 +29,10 @@ namespace Maliang.Loading
             obj.gameObject.AddComponent<MaterializeIn>();
             obj.gameObject.SetActive(true);
             Sfx.Play(SfxId.Materialize, centre);
-            MaliangLog.Info("Spawn", $"{obj.name} appeared");
+            string where = head != null
+                ? $", {Vector3.Distance(head.position, centre):F2} m from the player, {Vector3.Angle(head.forward, centre - head.position):F0}° off their view"
+                : "";
+            MaliangLog.Info("Spawn", $"{obj.name} appeared at {centre:F2}{where}");
         }
     }
 

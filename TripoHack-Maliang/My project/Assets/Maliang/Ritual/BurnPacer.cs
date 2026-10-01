@@ -34,8 +34,10 @@ namespace Maliang.Ritual
         public float creepMax = 0.12f;
         [Tooltip("...approaching it over about this many seconds (a real generation takes one to three minutes).")]
         public float creepTime = 60f;
-        [Tooltip("Furthest the fire burns before the job is done.")]
-        [Range(0f, 1f)] public float maxBeforeDone = 0.95f;
+        [Tooltip("Furthest the fire burns before the job is done (paper must clearly remain while it waits).")]
+        [Range(0f, 1f)] public float maxBeforeDone = 0.85f;
+        [Tooltip("Safety net: once the job is done the scroll must have burned away within this many seconds, or it is ended.")]
+        public float finishTimeout = 20f;
         [Tooltip("A failure shows only after this much has burned, so the fire is seen to catch first.")]
         public float minBurnBeforeFail = 0.06f;
 
@@ -48,7 +50,7 @@ namespace Maliang.Ritual
         public enum Phase { Idle, Burning, Holding, Loading, Embers, Finishing, Failed }
         public Phase Current { get; private set; } = Phase.Idle;
 
-        float _target, _creepTime;
+        float _target, _creepTime, _finishing;
 
         void Awake()
         {
@@ -151,6 +153,20 @@ namespace Maliang.Ritual
                 Set(Phase.Loading);
             }
 
+            // Safety net: the fire must not hang at the very end once the object is ready.
+            if (Current == Phase.Finishing)
+            {
+                _finishing += Time.deltaTime;
+                if (_finishing > finishTimeout && burn.IsBurning)
+                {
+                    MaliangLog.Warn("Burn", $"Scroll {ritual.Tag} still burning {_finishing:F0}s after its job finished " +
+                                            $"(burned {burn.Progress:P1}, target {burn.TargetProgress:P1}); ending the burn");
+                    burn.ForceFinish();
+                    return;
+                }
+            }
+            else _finishing = 0f;
+
             // Normal pace, easing into the limit so the fire settles into a smoulder rather than stopping dead.
             float room = cap - _target;
             float ease = cap >= 1f ? 1f : Mathf.Clamp01(room / Mathf.Max(0.001f, band));
@@ -172,7 +188,7 @@ namespace Maliang.Ritual
                 Phase.Failed => "the job failed",
                 _ => phase.ToString().ToLowerInvariant(),
             };
-            MaliangLog.Info("Burn", $"{what} (burned {burn.Progress:P0})");
+            MaliangLog.Info("Burn", $"Scroll {ritual.Tag}: {what} (burned {burn.Progress:P0})");
         }
     }
 }

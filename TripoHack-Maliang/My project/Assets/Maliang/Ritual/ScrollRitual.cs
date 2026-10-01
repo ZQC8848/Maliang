@@ -147,11 +147,44 @@ namespace Maliang.Ritual
         /// <summary>True once the scroll has left the desk: hovering after its seal, or further on in the ritual.</summary>
         public bool OffDesk => State >= ScrollState.Burning || (State == ScrollState.Levitating && IsHovering);
 
+        static int _nextId;
+        static bool _quitting;
+
+        /// <summary>Short number for logs ("Scroll #3"), so several scrolls in one session can be told apart.</summary>
+        public int Id { get; private set; }
+        public string Tag => $"#{Id}{(IsReplay ? " (replay)" : "")}";
+
+        /// <summary>Set before the scroll is cleared away on purpose (reset), so nothing is summoned on its way out.</summary>
+        public bool Discarding { get; set; }
+
+        bool _revealed;
+
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+        static void ResetStatics()
+        {
+            _nextId = 0;
+            _quitting = false;
+            Application.quitting -= OnQuitting;
+            Application.quitting += OnQuitting;
+        }
+
+        static void OnQuitting() => _quitting = true;
+
         void OnEnable() => All.Add(this);
-        void OnDisable() => All.Remove(this);
+
+        void OnDisable()
+        {
+            All.Remove(this);
+            // Safety net: a scroll whose object is ready must never take it away with it. If it goes away mid-burn
+            // (hidden or destroyed by anything other than burning away), the object appears where it was.
+            if (_quitting || Discarding || !Application.isPlaying || State != ScrollState.Burning) return;
+            if (Job != null && Job.Done && Job.Succeeded)
+                RevealPrepared($"scroll went away before it burned away ({(gameObject.activeInHierarchy ? "destroyed" : "hidden")})", warn: true);
+        }
 
         void Awake()
         {
+            Id = ++_nextId;
             _deskPos = Root.position;
             _deskRot = Root.rotation;
         }
@@ -198,7 +231,7 @@ namespace Maliang.Ritual
             _unrolling = null;
             State = ScrollState.Unrolled;
             canvas.InputLocked = IsReplay;
-            MaliangLog.Info("Ritual", IsReplay ? "Replay scroll unrolled; rising by itself." : "Scroll unrolled.");
+            MaliangLog.Info("Ritual", $"Scroll {Tag} unrolled{(IsReplay ? "; rising by itself" : "")}.");
             Unrolled?.Invoke();
             if (IsReplay) Levitate();
         }
@@ -230,9 +263,9 @@ namespace Maliang.Ritual
             Seal = type;
             canvas.InputLocked = true;
             State = ScrollState.Levitating;
-            MaliangLog.Info("Ritual", $"Sealed as {type} (ink coverage {canvas.InkCoverage:P1}); scroll rising.");
+            MaliangLog.Info("Ritual", $"Scroll {Tag} sealed as {type} (ink coverage {canvas.InkCoverage:P1}); rising.");
             Job = (StartJob != null && !FakeJob.Forced ? StartJob(this) : null) ?? new FakeJob(FakeJob.Settings, Time.time);
-            MaliangLog.Info("Ritual", $"Job started: {Job}");
+            MaliangLog.Info("Ritual", $"Scroll {Tag} job started: {Job}");
             Sealed?.Invoke(type);
             _rise = StartCoroutine(Rise());
         }
@@ -271,7 +304,7 @@ namespace Maliang.Ritual
             _hoverTime = 0f;
             IsHovering = true;
             _rise = null;
-            MaliangLog.Info("Ritual", "Scroll hovering; waiting for the candle.");
+            MaliangLog.Info("Ritual", $"Scroll {Tag} hovering at {Root.position:F2}; waiting for the candle.");
             Hovering?.Invoke();
         }
 
@@ -302,7 +335,7 @@ namespace Maliang.Ritual
                         if (!IsClear(p, rot, half)) continue;
                         Reserve(p, rot, half);
                         if (s > 0 || u > 0)
-                            MaliangLog.Info("Ritual", $"Hover spot taken; moved up {u * step:F2} m, sideways {sign * s * step:F2} m.");
+                            MaliangLog.Info("Ritual", $"Scroll {Tag}: hover spot taken; moved up {u * step:F2} m, sideways {sign * s * step:F2} m.");
                         return p;
                     }
                 }
@@ -379,13 +412,41 @@ namespace Maliang.Ritual
         /// </summary>
         public void OnBurnedAway()
         {
-            if (Job is IPreparedSummon summon && summon.Prepared != null) Summoning.Reveal(summon.Prepared, Root.position, Head);
+            RevealPrepared("burned away");
             State = ScrollState.Done;
             IsHovering = false;
             IsHeld = false;
             HasHoverReservation = false;
             BurnedAway?.Invoke();
             Root.gameObject.SetActive(false);
+        }
+
+        /// <summary>The summoned object (built hidden while the scroll burned) appears where the scroll is. Once.</summary>
+        void RevealPrepared(string why, bool warn = false)
+        {
+            if (_revealed || !(Job is IPreparedSummon summon)) return;
+            if (summon.Prepared == null)
+            {
+                MaliangLog.Warn("Spawn", $"Scroll {Tag} {why}, but its job has no object ready ({Job})");
+                return;
+            }
+            _revealed = true;
+            string msg = $"Scroll {Tag} {why}: revealing {summon.Prepared.name}";
+            if (warn) MaliangLog.Warn("Spawn", msg); else MaliangLog.Info("Spawn", msg);
+            Summoning.Reveal(summon.Prepared, Root.position, Head);
+        }
+
+        /// <summary>One line describing this scroll's state (debug key I).</summary>
+        public string Describe()
+        {
+            var burn = GetComponent<ScrollBurn>();
+            var pacer = GetComponent<BurnPacer>();
+            var prepared = (Job as IPreparedSummon)?.Prepared;
+            return $"Scroll {Tag} \"{name}\": {State}, active {gameObject.activeInHierarchy}, hovering {IsHovering}, held {IsHeld}, " +
+                   $"job {(Job != null ? $"{Job} done={Job.Done} ok={Job.Succeeded}" : "none")}, " +
+                   (burn != null ? $"burned {burn.Progress:P0} target {burn.TargetProgress:P0}, " : "") +
+                   (pacer != null ? $"phase {pacer.Current}, " : "") +
+                   $"object {(prepared != null ? (prepared.gameObject.activeSelf ? "shown" : "ready") : "-")}, at {Root.position:F2}";
         }
 
         // ------------------------------------------------------------------ failure
@@ -400,7 +461,7 @@ namespace Maliang.Ritual
             if (State != ScrollState.Burning && State != ScrollState.Levitating) return;
             State = ScrollState.Failed;
             HasHoverReservation = false;
-            MaliangLog.Info("Ritual", $"Summoning failed: {reason} (\"{FailReasons.Line(reason)}\")");
+            MaliangLog.Info("Ritual", $"Scroll {Tag} summoning failed: {reason} (\"{FailReasons.Line(reason)}\")");
             Failed?.Invoke(reason);
             _failing = StartCoroutine(FailSequence(reason));
         }
@@ -484,6 +545,7 @@ namespace Maliang.Ritual
             if (Job is SummonJob summoning) summoning.Cancel();
             Job = null;
             IsReplay = false;
+            _revealed = false;
             var burn = GetComponent<ScrollBurn>();
             if (burn != null) burn.ResetBurn();
             var pacer = GetComponent<BurnPacer>();
@@ -497,7 +559,7 @@ namespace Maliang.Ritual
             IsHeld = false;
             HasHoverReservation = false;
             State = ScrollState.Unrolled;
-            MaliangLog.Info("Ritual", "Scroll reset.");
+            MaliangLog.Info("Ritual", $"Scroll {Tag} reset.");
             ReturnedToDesk?.Invoke();
             RollUpAndUnroll(0.3f, animateRollUp: true); // roll up, then a fresh sheet unrolls again
         }

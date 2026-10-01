@@ -8,7 +8,7 @@ namespace Maliang.Ritual
     /// <summary>
     /// Development shortcuts for the desk: keyboard (editor / desktop) and the left controller's menu button.
     /// R or left menu: reset the scroll.   E: export the ink to TestData/Exports/ as PNG.
-    /// B: set the hovering scroll alight without the candle.
+    /// B: set the hovering scroll alight without the candle.   I: log the state of every scroll.
     /// 0: switch between the real agent and fake summoning (no API).
     /// Fake summoning (the fake job a sealed scroll waits on; also applied to the scroll in progress):
     /// 1: succeeds   2: fails at the verdict (unrecognizable)   3: fails during generation (collapsed)
@@ -59,6 +59,7 @@ namespace Maliang.Ritual
             }
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) ExportToTestData();
             if (Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame) IgniteHovering();
+            if (Keyboard.current != null && Keyboard.current.iKey.wasPressedThisFrame) LogScrolls();
             var kb = Keyboard.current;
             if (kb == null) return;
             if (kb.digit0Key.wasPressedThisFrame)
@@ -102,6 +103,14 @@ namespace Maliang.Ritual
                 active.Job = new FakeJob(fakeJob, Time.time);
             MaliangLog.Info("Debug", $"Fake summoning: {outcome}, verdict after {verdictDelay:F0}s" +
                                      (active != null && active.Job is FakeJob ? " (applied to the current scroll)" : ""));
+        }
+
+        /// <summary>Logs every scroll's state (to diagnose a summoning that did not appear).</summary>
+        [ContextMenu("Log Scrolls")]
+        public void LogScrolls()
+        {
+            foreach (var r in FindObjectsByType<ScrollRitual>(FindObjectsInactive.Include))
+                MaliangLog.Info("Debug", r.Describe());
         }
 
         /// <summary>Sets the hovering scroll alight at a random spot, without the candle (desktop testing).</summary>

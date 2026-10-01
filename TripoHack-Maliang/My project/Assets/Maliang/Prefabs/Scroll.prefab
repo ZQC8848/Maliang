@@ -561,9 +561,6 @@ MonoBehaviour:
   bobAmplitude: 0.012
   bobPeriod: 3.2
   remnantLifetime: 12
-  fizzleSound: {fileID: 0}
-  deflateSound: {fileID: 0}
-  thudSound: {fileID: 0}
   clearanceStep: 0.05
   maxLiftUp: 0.6
   maxShiftSide: 0.9
@@ -764,7 +761,6 @@ MonoBehaviour:
   station: {fileID: 0}
   pickableOnStart: 1
   grabCollider: {fileID: 7510450318159257690}
-  thudSound: {fileID: 0}
 --- !u!114 &5060725766671831415
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -813,6 +809,10 @@ MonoBehaviour:
   baseDuration: 14
   holdPoint: 0.4
   slowBand: 0.1
-  creepRate: 0.003
-  maxBeforeDone: 0.95
+  creepMax: 0.12
+  creepTime: 60
+  maxBeforeDone: 0.85
+  finishTimeout: 20
   minBurnBeforeFail: 0.06
+  replayDuration: 10
+  emberPoint: 0.97

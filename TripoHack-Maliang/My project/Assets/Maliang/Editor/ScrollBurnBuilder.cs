@@ -38,6 +38,13 @@ namespace Maliang.EditorTools
 
             var pacer = root.GetComponent<BurnPacer>();
             if (pacer == null) pacer = root.AddComponent<BurnPacer>();
+            else
+            {
+                var fresh = new GameObject("BurnPacer defaults") { hideFlags = HideFlags.HideAndDontSave };
+                fresh.AddComponent<ScrollBurn>(); // BurnPacer requires it
+                EditorUtility.CopySerialized(fresh.AddComponent<BurnPacer>(), pacer);
+                Object.DestroyImmediate(fresh);
+            }
             pacer.ritual = ritual;
             pacer.burn = burn;
             return burn;

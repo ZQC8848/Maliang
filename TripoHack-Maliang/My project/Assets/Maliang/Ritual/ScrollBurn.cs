@@ -213,7 +213,7 @@ namespace Maliang.Ritual
             CacheRods();
             if (candle != null) candle.Haptic(0.6f, 0.12f);
             Sfx.Play(SfxId.Ignite, PosToWorld(UvToPos(uv)));
-            MaliangLog.Info("Burn", $"Scroll caught fire at uv {uv.x:F2},{uv.y:F2}.");
+            MaliangLog.Info("Burn", $"Scroll {ritual?.Tag} caught fire at uv {uv.x:F2},{uv.y:F2}.");
             ritual?.OnBurnStarted();
             Ignited?.Invoke(this);
         }
@@ -589,7 +589,15 @@ namespace Maliang.Ritual
             var fade = s.rod.gameObject.AddComponent<FadeAndDestroy>();
             fade.delay = 4f;
             fade.deactivateOnly = true; // kept so a reset can put it back
-            MaliangLog.Info("Burn", $"{s.rod.name} fell.");
+            MaliangLog.Info("Burn", $"Scroll {ritual?.Tag}: {s.rod.name} fell.");
+        }
+
+        /// <summary>Ends the burn now (the pacer's safety net if the fire never quite finishes).</summary>
+        public void ForceFinish()
+        {
+            if (!IsBurning || IsBurnedAway || IsExtinguished) return;
+            Progress = 1f;
+            Finish();
         }
 
         // ------------------------------------------------------------------ failure
@@ -694,7 +702,7 @@ namespace Maliang.Ritual
             _burnLoop = null;
             if (_fx != null) Destroy(_fx, 4f);
             _fx = null;
-            MaliangLog.Info("Burn", "Scroll burned away.");
+            MaliangLog.Info("Burn", $"Scroll {ritual?.Tag} burned away.");
             ritual?.OnBurnedAway();
             BurnedAway?.Invoke(this);
         }
