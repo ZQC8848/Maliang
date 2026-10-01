@@ -1,3 +1,4 @@
+using Maliang.Core;
 using Maliang.Ritual;
 using Maliang.VR;
 using UnityEngine;
@@ -82,6 +83,8 @@ namespace Maliang.Drawing
         Vector3 _lastNibPos;
         float _grainTimer;
         bool _touching, _deepWarned;
+        AudioSource _strokeLoop;
+        float _strokeLevel; // set in Update while the nib moves on the paper, applied in LateUpdate
 
         public bool IsDrawing => _stroke != null && _stroke.Active;
         /// <summary>Every brush vibration sent (amplitude, duration), e.g. to drive a brush-on-paper sound.</summary>
@@ -142,9 +145,18 @@ namespace Maliang.Drawing
                 _stroke.SizeMultiplier = sizeMultiplier;
                 _stroke.AddPoint(target.UvToPixel(uv), pressure);
 
-                if (!_touching) { Buzz(touchPulse.x, touchPulse.y); _grainTimer = grainInterval; } // pen down
+                if (!_touching)
+                {
+                    // pen down
+                    Buzz(touchPulse.x, touchPulse.y);
+                    _grainTimer = grainInterval;
+                    Sfx.Play(SfxId.BrushTouch, nib.position, Mathf.Lerp(0.5f, 1f, t));
+                    if (_strokeLoop == null) _strokeLoop = Sfx.Loop(SfxId.BrushStrokeLoop, nib);
+                }
                 _touching = true;
                 Grain(t, speed);
+                // The brush whispers on the paper while it moves: louder faster and pressed harder.
+                _strokeLevel = Mathf.InverseLerp(grainSpeed.x, grainSpeed.y, speed) * Mathf.Lerp(0.6f, 1f, t);
             }
             else
             {
@@ -190,6 +202,10 @@ namespace Maliang.Drawing
 
         void LateUpdate()
         {
+            // The stroke sound follows this frame's level (0 unless the nib moved on the paper in Update).
+            Sfx.LoopVolume(_strokeLoop, SfxId.BrushStrokeLoop, _strokeLevel, 14f);
+            _strokeLevel = 0f;
+
             if (boneAnimator == null) return;
             if (IsDrawing)
             {

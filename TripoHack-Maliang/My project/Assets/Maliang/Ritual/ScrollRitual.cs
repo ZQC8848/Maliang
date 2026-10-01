@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using Maliang.Api;
 using Maliang.Core;
 using Maliang.Drawing;
 using Maliang.VR;
@@ -32,10 +33,12 @@ namespace Maliang.Ritual
     }
 
     /// <summary>
-    /// The scroll's state machine (TechPlan §6.1): Rolled → Unrolled → Levitating → Burning → Done.
+    /// The scroll's state machine (TechPlan §6.1): Rolled → Unrolled → Levitating → Burning → Done / Failed.
     /// The scroll starts rolled up and unrolls on the desk (<see cref="ScrollUnroll"/>); the seal is the "final" stroke —
     /// once it lands the drawing locks and the scroll rises to hover in front of the player. A candle sets it alight
-    /// (<see cref="ScrollBurn"/>); it keeps hovering while it burns, and is gone once it has burned away.
+    /// (<see cref="ScrollBurn"/>); it keeps hovering while it burns, and is gone once it has burned away. The seal starts
+    /// the summoning job (<see cref="Job"/>) that the burn waits on; if it fails, the fire goes out and the scroll drops
+    /// as a remnant (<see cref="Fail"/>).
     /// </summary>
     public class ScrollRitual : MonoBehaviour
     {
@@ -69,6 +72,10 @@ namespace Maliang.Ritual
         public float bobAmplitude = 0.012f;
         public float bobPeriod = 3.2f;
 
+        [Header("Failure (Phase3Design 7.2)")]
+        [Tooltip("Seconds the failed remnant lies about (can be picked up and thrown) before it crumbles to ash.")]
+        public float remnantLifetime = 12f;
+
         [Header("Hover clearance")]
         [Tooltip("Before rising, the hover spot is checked for objects and other hovering scrolls. If it is taken the " +
                  "scroll moves up in these steps (m) first, then sideways.")]
@@ -98,6 +105,7 @@ namespace Maliang.Ritual
         public event Action<SealType> Sealed;
         public event Action Hovering;
         public event Action BurnStarted;
+        public event Action<FailReason> Failed;
         /// <summary>The paper has burned away (the summoning follows in Phase 5).</summary>
         public event Action BurnedAway;
         /// <summary>Put back on the desk (reset).</summary>
@@ -109,6 +117,17 @@ namespace Maliang.Ritual
         float _hoverTime;
         Coroutine _rise;
         Coroutine _unrolling;
+        Coroutine _failing;
+        FailMessage _message;
+
+        /// <summary>
+        /// Starts the summoning job when a scroll is sealed. Phase 5 sets this to the real <see cref="ObjectAgent"/>;
+        /// left null, a <see cref="FakeJob"/> from <see cref="FakeJob.Settings"/> stands in (no network).
+        /// </summary>
+        public static Func<ScrollRitual, IBurnJob> StartJob;
+
+        /// <summary>The summoning job started at the seal (what the burn waits on).</summary>
+        public IBurnJob Job { get; set; }
 
         Transform Root => scrollRoot != null ? scrollRoot : canvas.transform;
         Transform Head => head != null ? head : (Camera.main != null ? Camera.main.transform : null);
@@ -181,6 +200,8 @@ namespace Maliang.Ritual
             canvas.InputLocked = true;
             State = ScrollState.Levitating;
             MaliangLog.Info("Ritual", $"Sealed as {type} (ink coverage {canvas.InkCoverage:P1}); scroll rising.");
+            Job = StartJob != null ? StartJob(this) : new FakeJob(FakeJob.Settings, Time.time);
+            MaliangLog.Info("Ritual", $"Job started: {Job}");
             Sealed?.Invoke(type);
             _rise = StartCoroutine(Rise());
         }
@@ -188,6 +209,7 @@ namespace Maliang.Ritual
         IEnumerator Rise()
         {
             yield return new WaitForSeconds(holdBeforeRise);
+            Sfx.Play(SfxId.ScrollRise, Root.position);
 
             var head = Head;
             Vector3 fwd = head != null ? Vector3.ProjectOnPlane(head.forward, Vector3.up) : Vector3.forward;
@@ -331,9 +353,85 @@ namespace Maliang.Ritual
             Root.gameObject.SetActive(false);
         }
 
+        // ------------------------------------------------------------------ failure
+
+        /// <summary>
+        /// The summoning failed (Phase3Design 7.2): the fire goes out and cools, the scroll shivers, drops as a
+        /// physical remnant the player can pick up and throw, the reason appears above where it lands, and after
+        /// <see cref="remnantLifetime"/> it crumbles to ash. Frees the hover spot for the next scroll.
+        /// </summary>
+        public void Fail(FailReason reason)
+        {
+            if (State != ScrollState.Burning && State != ScrollState.Levitating) return;
+            State = ScrollState.Failed;
+            HasHoverReservation = false;
+            MaliangLog.Info("Ritual", $"Summoning failed: {reason} (\"{FailReasons.Line(reason)}\")");
+            Failed?.Invoke(reason);
+            _failing = StartCoroutine(FailSequence(reason));
+        }
+
+        IEnumerator FailSequence(FailReason reason)
+        {
+            var burn = GetComponent<ScrollBurn>();
+            var pickup = GetComponent<ScrollPickup>();
+
+            // 0.0 s: the fire freezes and cools from orange to grey, a few wisps of smoke.
+            if (burn != null) burn.Extinguish(1.2f);
+            Sfx.Play(SfxId.Fizzle, Root.position);
+            yield return new WaitForSeconds(1.2f);
+
+            // 1.2 s: the magic leaves: the bob stops and the scroll gives a small shiver.
+            IsHovering = false;
+            Sfx.Play(SfxId.Deflate, Root.position);
+            Quaternion rest = Root.rotation;
+            Vector3 restPos = Root.position;
+            for (float t = 0f; t < 0.3f; t += Time.deltaTime)
+            {
+                if (IsHeld) break;
+                float a = (1f - t / 0.3f) * 2.5f;
+                Root.SetPositionAndRotation(restPos, rest * Quaternion.Euler(
+                    Mathf.Sin(t * 90f) * a, Mathf.Sin(t * 70f + 1f) * a * 0.5f, Mathf.Sin(t * 110f + 2f) * a));
+                yield return null;
+            }
+            if (!IsHeld) Root.SetPositionAndRotation(restPos, rest);
+            yield return new WaitForSeconds(0.1f);
+
+            // 1.6 s: gravity: it drops and becomes a remnant that can be picked up and thrown.
+            Vector3 landing = LandingPoint();
+            if (pickup != null) pickup.BecomeRemnant();
+            yield return new WaitForSeconds(0.2f);
+
+            // 1.8 s: the reason, in English, above where it lands.
+            _message = FailMessage.Show(FailReasons.Line(reason), landing + Vector3.up * 0.32f, Head);
+
+            yield return new WaitForSeconds(Mathf.Max(0f, remnantLifetime));
+            bool crumbled = false;
+            if (pickup != null) pickup.FreezeRemnant();
+            if (burn != null) burn.Crumble(1.5f, () => crumbled = true);
+            else crumbled = true;
+            while (!crumbled) yield return null;
+            _failing = null;
+            Root.gameObject.SetActive(false);
+        }
+
+        /// <summary>Where the dropped scroll will come to rest: the first surface below it (not the scroll, not the player).</summary>
+        Vector3 LandingPoint()
+        {
+            var rig = Head != null ? Head.root : null;
+            var hits = Physics.RaycastAll(Root.position, Vector3.down, 5f, ~0, QueryTriggerInteraction.Ignore);
+            float best = float.MaxValue;
+            Vector3 point = Root.position + Vector3.down * 1f;
+            foreach (var h in hits)
+            {
+                if (h.transform.IsChildOf(transform) || (rig != null && h.transform.IsChildOf(rig))) continue;
+                if (h.distance < best) { best = h.distance; point = h.point; }
+            }
+            return point;
+        }
+
         void Update()
         {
-            if (!IsHovering || (State != ScrollState.Levitating && State != ScrollState.Burning) || IsHeld) return;
+            if (!IsHovering || (State != ScrollState.Levitating && State != ScrollState.Burning && State != ScrollState.Failed) || IsHeld) return;
             _hoverTime += Time.deltaTime;
             float bob = Mathf.Sin(_hoverTime * Mathf.PI * 2f / bobPeriod) * bobAmplitude;
             Root.position = _hoverPos + Vector3.up * bob;
@@ -345,8 +443,15 @@ namespace Maliang.Ritual
         {
             Root.gameObject.SetActive(true);
             if (_rise != null) { StopCoroutine(_rise); _rise = null; }
+            if (_failing != null) { StopCoroutine(_failing); _failing = null; }
+            if (_message != null) { _message.Hide(); _message = null; }
+            Job = null;
             var burn = GetComponent<ScrollBurn>();
             if (burn != null) burn.ResetBurn();
+            var pacer = GetComponent<BurnPacer>();
+            if (pacer != null) pacer.ResetPacing();
+            var pickup = GetComponent<ScrollPickup>();
+            if (pickup != null) pickup.EndRemnant();
             Root.SetPositionAndRotation(_deskPos, _deskRot);
             canvas.ClearAll();
             Seal = null;

@@ -1,0 +1,69 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 080096721bfa8d24296c1daf522dbbde, type: 3}
+  m_Name: SoundBank
+  m_EditorClassIdentifier: Assembly-CSharp::Maliang.Core.SoundBank
+  sounds:
+  - id: brush_stroke_loop
+    clip: {fileID: 8300000, guid: 0cc5c3fac55b1b94898d2c705c8546b5, type: 3}
+    volume: 0.45
+  - id: brush_touch
+    clip: {fileID: 8300000, guid: 8a83ca725d2d5bf449478539cb95a02e, type: 3}
+    volume: 0.35
+  - id: burn_loop
+    clip: {fileID: 8300000, guid: 7ae512fd0b178f847aef74b486811ac9, type: 3}
+    volume: 0.8
+  - id: crumble
+    clip: {fileID: 8300000, guid: 001b485f34e46f74c8b202b7a8daaa14, type: 3}
+    volume: 0.6
+  - id: deflate
+    clip: {fileID: 8300000, guid: 39acc91e9603aa7489480abc1bd3116c, type: 3}
+    volume: 0.7
+  - id: desk_ambience
+    clip: {fileID: 8300000, guid: 6ed4b05844f0afd43abdd919f7c6b70d, type: 3}
+    volume: 0.35
+  - id: drawer_knock
+    clip: {fileID: 8300000, guid: ab10c973d10cecc4f9d5388a9e7aeebb, type: 3}
+    volume: 0.6
+  - id: drawer_slide_loop
+    clip: {fileID: 8300000, guid: dcd059a8a807e454ba465d64e42d1994, type: 3}
+    volume: 0.5
+  - id: ember_pop
+    clip: {fileID: 8300000, guid: b87f9a35a5b9fc342a12dcfa7d8ba437, type: 3}
+    volume: 0.5
+  - id: fizzle
+    clip: {fileID: 8300000, guid: 1e3eef6d6742b074da0a6453f4d66d53, type: 3}
+    volume: 0.8
+  - id: ignite
+    clip: {fileID: 8300000, guid: 35b4b12ef957f894996c8e1d594dfda1, type: 3}
+    volume: 0.8
+  - id: ink_dip
+    clip: {fileID: 8300000, guid: da9f3354d13b0464e8c7ea98e0c97f36, type: 3}
+    volume: 0.6
+  - id: materialize
+    clip: {fileID: 8300000, guid: 38489839f94d4224da155dfbae244d4e, type: 3}
+    volume: 0.8
+  - id: rod_fall
+    clip: {fileID: 8300000, guid: 6eccfc550d963b347bda333910a5a191, type: 3}
+    volume: 0.7
+  - id: scroll_rise
+    clip: {fileID: 8300000, guid: 730e6ef3b2499b14aabfd0b7e55496f1, type: 3}
+    volume: 0.6
+  - id: scroll_roll
+    clip: {fileID: 8300000, guid: 37639e3b65b6d1247891814b3cbefc80, type: 3}
+    volume: 0.5
+  - id: scroll_thud
+    clip: {fileID: 8300000, guid: 496a5a44cb4a61d4980f6b2965c0cf43, type: 3}
+    volume: 0.8
+  - id: seal_stamp
+    clip: {fileID: 8300000, guid: 7dcfb448fa420b243a4d529a3977feed, type: 3}
+    volume: 0.9

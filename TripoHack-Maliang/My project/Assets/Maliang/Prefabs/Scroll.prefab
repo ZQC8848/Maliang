@@ -484,6 +484,7 @@ GameObject:
   - component: {fileID: 2557446098729907048}
   - component: {fileID: 2529452168175046286}
   - component: {fileID: 5060725766671831415}
+  - component: {fileID: 2534534521428368231}
   m_Layer: 0
   m_Name: Scroll
   m_TagString: Untagged
@@ -559,6 +560,10 @@ MonoBehaviour:
   hoverTiltBack: 12
   bobAmplitude: 0.012
   bobPeriod: 3.2
+  remnantLifetime: 12
+  fizzleSound: {fileID: 0}
+  deflateSound: {fileID: 0}
+  thudSound: {fileID: 0}
   clearanceStep: 0.05
   maxLiftUp: 0.6
   maxShiftSide: 0.9
@@ -759,6 +764,7 @@ MonoBehaviour:
   station: {fileID: 0}
   pickableOnStart: 1
   grabCollider: {fileID: 7510450318159257690}
+  thudSound: {fileID: 0}
 --- !u!114 &5060725766671831415
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -783,8 +789,6 @@ MonoBehaviour:
   scorchLead: 2
   newPointsUntil: 0.85
   maxClockRate: 4
-  selfTimed: 1
-  selfTimedDuration: 14
   flameMaterial: {fileID: 2100000, guid: 86735624ef2cb9d4eae89864d9aaf702, type: 2}
   emberMaterial: {fileID: 2100000, guid: 2eac0fe8efd32e24498e1e4ddbcae2bd, type: 2}
   ashMaterial: {fileID: 2100000, guid: 7d923fa3fd034af4c9b33683018ace8f, type: 2}
@@ -792,3 +796,23 @@ MonoBehaviour:
   lightColor: {r: 1, g: 0.55, b: 0.25, a: 1}
   lightIntensity: 1.1
   flameDensity: 420
+--- !u!114 &2534534521428368231
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7324142414113519066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e015ab6e6df424841a075af6c1bc54d8, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Maliang.Ritual.BurnPacer
+  ritual: {fileID: 3155647621018428805}
+  burn: {fileID: 5060725766671831415}
+  baseDuration: 14
+  holdPoint: 0.4
+  slowBand: 0.1
+  creepRate: 0.003
+  maxBeforeDone: 0.95
+  minBurnBeforeFail: 0.06

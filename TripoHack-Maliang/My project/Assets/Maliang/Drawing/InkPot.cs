@@ -1,3 +1,4 @@
+using Maliang.Core;
 using UnityEngine;
 
 namespace Maliang.Drawing
@@ -28,6 +29,7 @@ namespace Maliang.Drawing
         {
             var pen = other.GetComponentInParent<BrushPen>();
             if (pen == null || other != pen.nibCollider) return;
+            Sfx.Play(SfxId.InkDip, other.transform.position);
             if (pen.inkColor == color) return;
             pen.SetInk(color);
             pen.Haptic(0.3f, 0.06f);

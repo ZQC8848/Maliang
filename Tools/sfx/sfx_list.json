@@ -1,0 +1,105 @@
+{
+  "_comment": "Pre-made sound effects for the desk ritual (ElevenLabs eleven_text_to_sound_v2), processed into Assets/Maliang/Audio/SFX/<id>.wav. seconds = generated length; loop = seamless loop; influence = prompt_influence (default 0.5); gain_db = boost for quiet sounds. Regenerate one with: python Tools/sfx/generate_sfx.py <id>",
+  "sounds": [
+    {
+      "id": "scroll_roll",
+      "seconds": 2.0,
+      "prompt": "A paper scroll with two small wooden rods unrolling across a wooden desk: soft dry paper rustle and gentle wooden rolling, close, quiet room. No music."
+    },
+    {
+      "id": "brush_touch",
+      "seconds": 0.5,
+      "prompt": "The soft tip of a calligraphy brush touching rice paper: one tiny soft papery tap, very close and quiet. No music."
+    },
+    {
+      "id": "brush_stroke_loop",
+      "seconds": 4.0,
+      "loop": true,
+      "prompt": "Continuous soft calligraphy brush dragging across rice paper: a gentle, even papery swish, very close, steady, no pauses. No music."
+    },
+    {
+      "id": "ink_dip",
+      "seconds": 0.7,
+      "prompt": "A calligraphy brush dipped into a small stone dish of ink: a soft wet tap with a tiny liquid sound, close. No music.",
+      "gain_db": 6
+    },
+    {
+      "id": "seal_stamp",
+      "seconds": 0.7,
+      "prompt": "A heavy stone seal pressed firmly onto paper lying on a wooden desk: a single dull, solid, satisfying thump, close. No music."
+    },
+    {
+      "id": "scroll_rise",
+      "seconds": 2.5,
+      "prompt": "A gentle magical rising shimmer: soft airy chimes and a warm breath swelling upwards, mystical and quiet, East Asian feel. No melody, no voice."
+    },
+    {
+      "id": "ignite",
+      "seconds": 1.0,
+      "prompt": "Paper catching fire from a candle: a soft whoosh as the flame takes hold, with the first small crackles, close. No music."
+    },
+    {
+      "id": "burn_loop",
+      "seconds": 6.0,
+      "loop": true,
+      "prompt": "A sheet of paper burning steadily: soft crackling, small pops and a gentle fluttering flame, close and continuous. No music.",
+      "gain_db": 17
+    },
+    {
+      "id": "ember_pop",
+      "seconds": 0.5,
+      "prompt": "A single tiny crackle pop of a burning paper ember, very short and close. No music."
+    },
+    {
+      "id": "rod_fall",
+      "seconds": 0.8,
+      "prompt": "A small thin wooden rod falling and clattering on a wooden table, light, short, close. No music."
+    },
+    {
+      "id": "fizzle",
+      "seconds": 1.2,
+      "prompt": "Small flames on burning paper suddenly put out: a soft hiss and a little puff of smoke, close. No music."
+    },
+    {
+      "id": "deflate",
+      "seconds": 1.3,
+      "prompt": "Magic energy draining away: a low, soft, descending deflating whoosh, sad and quiet, mystical. No melody, no voice."
+    },
+    {
+      "id": "scroll_thud",
+      "seconds": 0.6,
+      "prompt": "A scroll of paper with wooden rods dropped onto a wooden desk: a dull soft thud with a light papery slap, close. No music."
+    },
+    {
+      "id": "crumble",
+      "seconds": 1.6,
+      "prompt": "Dry burnt paper crumbling into ash: faint soft crackling rustle and sifting dust, close and quiet. No music.",
+      "gain_db": 8
+    },
+    {
+      "id": "materialize",
+      "seconds": 2.5,
+      "prompt": "A magical object materializing out of smoke and embers: a warm shimmering bloom with a soft deep resonance, mystical, East Asian feel. No melody, no voice."
+    },
+    {
+      "id": "drawer_slide_loop",
+      "seconds": 3.0,
+      "loop": true,
+      "prompt": "Constant, steady wood-on-wood sliding friction of an antique wooden drawer gliding at an even speed, continuous and uniform, close. No knocks, no starts or stops, no music.",
+      "influence": 0.7
+    },
+    {
+      "id": "drawer_knock",
+      "seconds": 0.5,
+      "prompt": "A wooden drawer reaching its end with a soft wooden knock, short, close. No music.",
+      "gain_db": 6
+    },
+    {
+      "id": "desk_ambience",
+      "seconds": 20.0,
+      "loop": true,
+      "prompt": "Calm open-air ambience high in misty mountains above the clouds: soft gentle wind, very distant birds and a faraway waterfall, peaceful and spacious. No music, no voices.",
+      "gain_db": 20
+    }
+  ]
+}

@@ -10,14 +10,16 @@ using UnityEngine;
 namespace Maliang.EditorTools
 {
     /// <summary>
-    /// Runs the burn without a headset (play mode): lays the spare scroll on the desk, paints the test drawing, seals
-    /// it, holds the candle flame against the paper until it catches, takes the candle away, and saves a frame from the
-    /// main camera at each of <see cref="Shots"/> (burned share) to TestData/Burn/&lt;time&gt;/.
+    /// Runs the burn without a headset (play mode) against a fake summoning job: lays the spare scroll on the desk,
+    /// paints the test drawing, seals it, holds the candle flame against the paper until it catches, takes the candle
+    /// away, and saves frames to TestData/Burn/&lt;time&gt;_&lt;outcome&gt;/: at set burned shares, while the fire waits
+    /// at the hold point, and through the failure sequence. A capture camera at the player's head follows the scroll,
+    /// so the remnant stays in view when it drops.
     /// </summary>
     public static class BurnTestDriver
     {
         static readonly float[] Shots = { 0.05f, 0.2f, 0.4f, 0.6f, 0.8f, 0.95f };
-        const float BurnDuration = 40f;
+        static readonly float[] FailShots = { 0.4f, 1.0f, 1.7f, 2.6f, 5f, 14.4f };
         static readonly Vector2 TouchUv = new Vector2(0.62f, 0.3f);
 
         enum Step { LayDown, WaitUnrolled, WaitHover, Touch, Burning, Done }
@@ -25,23 +27,39 @@ namespace Maliang.EditorTools
         static Step _step;
         static ScrollRitual _scroll;
         static ScrollBurn _burn;
+        static BurnPacer _pacer;
         static Transform _candle;
         static Vector3 _candleRest;
-        static int _shot;
+        static int _shot, _failShot;
+        static bool _holdShot;
+        static float _failedAt = -1f, _stepTime;
         static string _dir;
-        static float _stepTime;
+        static FakeJobSettings _settings;
+        static Camera _capture;
 
-        [MenuItem("Maliang/Debug/Burn Test (Play Mode)")]
-        public static void Run()
+        [MenuItem("Maliang/Debug/Burn Test/Success (Play Mode)")]
+        static void RunSuccess() => Run(FakeOutcome.Success, 6f);
+        [MenuItem("Maliang/Debug/Burn Test/Fail At Verdict (Play Mode)")]
+        static void RunFailVerdict() => Run(FakeOutcome.FailAtVerdict, 6f);
+        [MenuItem("Maliang/Debug/Burn Test/Fail During Generation (Play Mode)")]
+        static void RunFailGeneration() => Run(FakeOutcome.FailAfterVerdict, 6f);
+        [MenuItem("Maliang/Debug/Burn Test/Slow Verdict - Hold At 40% (Play Mode)")]
+        static void RunSlowVerdict() => Run(FakeOutcome.Success, 25f);
+
+        public static void Run(FakeOutcome outcome, float verdictDelay, float generationTime = 20f)
         {
             if (!Application.isPlaying) { Debug.LogWarning("[BurnTest] enter play mode first"); return; }
+            _settings = new FakeJobSettings { outcome = outcome, verdictDelay = verdictDelay, generationTime = generationTime };
             _step = Step.LayDown;
-            _shot = 0;
-            _dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "TestData", "Burn", System.DateTime.Now.ToString("HHmmss")));
+            _shot = _failShot = 0;
+            _holdShot = false;
+            _failedAt = -1f;
+            _dir = Path.GetFullPath(Path.Combine(Application.dataPath, "..", "TestData", "Burn",
+                $"{System.DateTime.Now:HHmmss}_{outcome}{(verdictDelay > 10f ? "_slow" : "")}"));
             Directory.CreateDirectory(_dir);
             EditorApplication.update -= Tick;
             EditorApplication.update += Tick;
-            Debug.Log("[BurnTest] started -> " + _dir);
+            Debug.Log($"[BurnTest] {outcome}, verdict {verdictDelay:F0}s, generation {generationTime:F0}s -> {_dir}");
         }
 
         static void Next(Step s)
@@ -52,7 +70,7 @@ namespace Maliang.EditorTools
 
         static void Tick()
         {
-            if (!Application.isPlaying) { EditorApplication.update -= Tick; return; }
+            if (!Application.isPlaying) { Stop(); return; }
             var station = Object.FindAnyObjectByType<ScrollStation>();
             switch (_step)
             {
@@ -66,16 +84,16 @@ namespace Maliang.EditorTools
                 case Step.WaitUnrolled:
                     if (_scroll.State != ScrollState.Unrolled) return;
                     CanvasTestPainter.PaintMountainScene(_scroll.canvas, Object.FindAnyObjectByType<BrushPen>().CurrentStyle);
+                    FakeJob.Settings = _settings;
                     _scroll.OnSealed(SealType.Object);
                     _burn = _scroll.GetComponent<ScrollBurn>();
-                    _burn.selfTimedDuration = BurnDuration;
+                    _pacer = _scroll.GetComponent<BurnPacer>();
                     Next(Step.WaitHover);
                     break;
 
                 case Step.WaitHover:
                     if (!_scroll.CanIgnite) return;
-                    var flame = CandleFlame.All[0];
-                    _candle = flame.GetComponentInParent<GrabbableTool>().transform;
+                    _candle = CandleFlame.All[0].GetComponentInParent<GrabbableTool>().transform;
                     _candleRest = _candle.position;
                     Next(Step.Touch);
                     break;
@@ -97,6 +115,28 @@ namespace Maliang.EditorTools
                     break;
 
                 case Step.Burning:
+                    float t = Time.time - _stepTime;
+                    if (_scroll.State == ScrollState.Failed)
+                    {
+                        if (_failedAt < 0f) _failedAt = Time.time;
+                        float since = Time.time - _failedAt;
+                        if (_failShot < FailShots.Length && since >= FailShots[_failShot])
+                        {
+                            Capture($"fail_{FailShots[_failShot]:00.0}s.png");
+                            _failShot++;
+                        }
+                        if (!_scroll.gameObject.activeInHierarchy)
+                        {
+                            Debug.Log($"[BurnTest] failure sequence done ({since:F1}s); frames in {_dir}");
+                            Stop();
+                        }
+                        return;
+                    }
+                    if (!_holdShot && _pacer != null && _pacer.Current == BurnPacer.Phase.Holding && t > 4f)
+                    {
+                        Capture($"hold_{Mathf.RoundToInt(_burn.Progress * 100):00}.png");
+                        _holdShot = true;
+                    }
                     if (_shot < Shots.Length && _burn.Progress >= Shots[_shot])
                     {
                         Capture($"burn_{Mathf.RoundToInt(_burn.Progress * 100):00}.png");
@@ -104,7 +144,7 @@ namespace Maliang.EditorTools
                     }
                     if (_burn.IsBurnedAway)
                     {
-                        Debug.Log($"[BurnTest] burned away after {Time.time - _stepTime:F1}s; frames in {_dir}");
+                        Debug.Log($"[BurnTest] burned away after {t:F1}s; frames in {_dir}");
                         Stop();
                     }
                     break;
@@ -115,20 +155,34 @@ namespace Maliang.EditorTools
         {
             _step = Step.Done;
             EditorApplication.update -= Tick;
+            if (_capture != null) Object.Destroy(_capture.gameObject);
+            _capture = null;
         }
 
+        /// <summary>A frame from the player's eye position, looking at the scroll (wherever it has fallen).</summary>
         static void Capture(string file)
         {
-            var cam = Camera.main;
+            var main = Camera.main;
+            if (_capture == null)
+            {
+                var go = new GameObject("Burn Test Capture Camera");
+                _capture = go.AddComponent<Camera>();
+                _capture.CopyFrom(main);
+                _capture.enabled = false;
+            }
+            Vector3 eye = main.transform.position;
+            Vector3 look = _scroll.canvas.transform.position - eye;
+            _capture.transform.SetPositionAndRotation(eye, Quaternion.LookRotation(look.sqrMagnitude > 1e-4f ? look : main.transform.forward, Vector3.up));
+            _capture.fieldOfView = 70f;
+
             var rt = new RenderTexture(1280, 720, 24);
-            var prev = cam.targetTexture;
-            cam.targetTexture = rt;
-            cam.Render();
+            _capture.targetTexture = rt;
+            _capture.Render();
             RenderTexture.active = rt;
             var tex = new Texture2D(1280, 720, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, 1280, 720), 0, 0);
             tex.Apply();
-            cam.targetTexture = prev;
+            _capture.targetTexture = null;
             RenderTexture.active = null;
             File.WriteAllBytes(Path.Combine(_dir, file), tex.EncodeToPNG());
             Object.DestroyImmediate(tex);

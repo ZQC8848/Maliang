@@ -5,8 +5,8 @@ using UnityEngine;
 namespace Maliang.EditorTools
 {
     /// <summary>
-    /// Sets up burning on the scroll (Phase 4): the <see cref="ScrollBurn"/> component and its effect materials (flame
-    /// and ember on the flame shader with occlusion, ash and smoke on the ash shader). Used by
+    /// Sets up burning on the scroll (Phase 4): <see cref="ScrollBurn"/>, <see cref="BurnPacer"/> and the effect
+    /// materials (flame and ember on the flame shader with occlusion, ash and smoke on the ash shader). Used by
     /// <see cref="DeskSceneBuilder"/> when it builds the scroll prefab, and by the menu item to add it to the existing
     /// prefab in place (keeps the scene's references).
     /// </summary>
@@ -35,6 +35,11 @@ namespace Maliang.EditorTools
             burn.emberMaterial = Mat("Burn Ember", "Maliang/Flame", ("_Shape", 1f), ("_Intensity", 2.2f), ("_Softness", 1.1f), ("_Occlusion", 0.6f));
             burn.ashMaterial = Mat("Burn Ash", "Maliang/Ash", ("_Softness", 0.35f), ("_Ragged", 0.25f));
             burn.smokeMaterial = Mat("Burn Smoke", "Maliang/Ash", ("_Softness", 1f), ("_Ragged", 0.06f));
+
+            var pacer = root.GetComponent<BurnPacer>();
+            if (pacer == null) pacer = root.AddComponent<BurnPacer>();
+            pacer.ritual = ritual;
+            pacer.burn = burn;
             return burn;
         }
 

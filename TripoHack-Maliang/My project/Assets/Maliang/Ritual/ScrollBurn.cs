@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using Maliang.Core;
 using Maliang.Drawing;
@@ -14,9 +15,10 @@ namespace Maliang.Ritual
     /// as embers jumping just ahead of the fire, some anywhere on the paper: each first browns as a scorch spot, then
     /// opens a hole of its own. Every hole spreads at the same speed.
     ///
-    /// <see cref="Progress"/> (0..1, never goes back) is the burned share of the paper; whoever drives the ritual
-    /// sets <see cref="TargetProgress"/> (a fake timer for now, later the job progress with its 40% hold point).
-    /// The fire's own clock follows it: when the target stops, the fire stops and smoulders.
+    /// <see cref="Progress"/> (0..1, never goes back) is the burned share of the paper; <see cref="BurnPacer"/> sets
+    /// <see cref="TargetProgress"/> from the summoning job (with its 40% hold point). The fire's own clock follows it:
+    /// when the target stops, the fire stops and smoulders. On failure the fire is put out (<see cref="Extinguish"/>)
+    /// and the remnant later crumbles to ash (<see cref="Crumble"/>).
     /// </summary>
     public class ScrollBurn : MonoBehaviour
     {
@@ -46,11 +48,6 @@ namespace Maliang.Ritual
         [Tooltip("The fire clock catches up with the target at most this many times real speed.")]
         public float maxClockRate = 4f;
 
-        [Header("Fake timer (until the job drives the burn)")]
-        [Tooltip("Without a driver, the burn runs on its own over this many seconds.")]
-        public bool selfTimed = true;
-        public float selfTimedDuration = 14f;
-
         [Header("Effects")]
         public Material flameMaterial;   // Burn Flame (flame shader with occlusion, reads against the bright sky)
         public Material emberMaterial;   // Burn Ember
@@ -69,8 +66,12 @@ namespace Maliang.Ritual
         public bool IsBurnedAway { get; private set; }
         /// <summary>Burned share of the paper (0..1); never goes back.</summary>
         public float Progress { get; private set; }
-        /// <summary>Where the burn is heading. Set by the driver; with <see cref="selfTimed"/> the burn sets it itself.</summary>
+        /// <summary>Where the burn is heading (set by <see cref="BurnPacer"/>).</summary>
         public float TargetProgress { get; set; }
+        /// <summary>Waiting at the hold point: the fire smoulders and its edge glows in slow breaths.</summary>
+        public bool Holding { get; set; }
+        /// <summary>Put out (failure): the fire no longer advances.</summary>
+        public bool IsExtinguished { get; private set; }
         /// <summary>The canvas UV the candle lit.</summary>
         public Vector2 IgnitionUv { get; private set; }
 
@@ -82,17 +83,22 @@ namespace Maliang.Ritual
             public Vector2 pos;   // canvas metres from the centre
             public float start;   // fire clock time it catches
             public float speed;   // m per clock second
+            public bool caught;   // has passed its start (for the pop as it catches)
         }
 
         static readonly int BurnPointsId = Shader.PropertyToID("_BurnPoints");
         static readonly int BurnCountId = Shader.PropertyToID("_BurnCount");
         static readonly int CanvasSizeId = Shader.PropertyToID("_CanvasSize");
+        static readonly int GlowGainId = Shader.PropertyToID("_GlowGain");
+        static readonly int CoolId = Shader.PropertyToID("_Cool");
+        static readonly int CrumbleId = Shader.PropertyToID("_Crumble");
 
         readonly List<BurnPoint> _points = new List<BurnPoint>();
         readonly Vector4[] _shaderPoints = new Vector4[MaxPoints];
         readonly float[] _cellTime = new float[GridX * GridY];   // fire clock time each cell burns
         readonly float[] _sorted = new float[GridX * GridY];
-        float _clock, _nextPoint, _selfTime, _contact, _frontLength, _heat;
+        float _clock, _nextPoint, _contact, _frontLength, _heat, _glowGain = 1f;
+        Coroutine _ending;
         Material _mat;
         Vector2 _size;
 
@@ -100,6 +106,7 @@ namespace Maliang.Ritual
         GameObject _fx;
         ParticleSystem _flames, _embers, _ash, _smoke;
         Light _light;
+        AudioSource _burnLoop;
         float _emitDebt;
 
         // Rods fall once the paper next to them has burned
@@ -123,18 +130,17 @@ namespace Maliang.Ritual
 
         void Update()
         {
-            if (IsBurnedAway) return;
+            if (IsBurnedAway || IsExtinguished) return;
             if (!IsBurning)
             {
                 if (ritual != null && ritual.CanIgnite) CheckCandles();
                 else _contact = 0f;
                 return;
             }
-            if (selfTimed)
-            {
-                _selfTime += Time.deltaTime;
-                TargetProgress = Mathf.Pow(Mathf.Clamp01(_selfTime / Mathf.Max(0.1f, selfTimedDuration)), 1.25f);
-            }
+            // Holding: the edge glow breathes slowly, as if the fire were gathering itself.
+            float gain = Holding ? 0.6f + 0.4f * Mathf.Sin(Time.time * 2.4f) : 1f;
+            _glowGain = Mathf.Lerp(_glowGain, gain, Time.deltaTime * 4f);
+            if (_mat != null) _mat.SetFloat(GlowGainId, _glowGain);
             AdvanceClock();
             UpdateEffects();
             UpdateRods();
@@ -199,7 +205,6 @@ namespace Maliang.Ritual
             _points.Add(new BurnPoint { pos = UvToPos(uv), start = 0f, speed = spreadSpeed });
             _clock = 0f;
             _heat = 1f;
-            _selfTime = 0f;
             Progress = 0f;
             TargetProgress = 0f;
             _nextPoint = UnityEngine.Random.Range(newPointInterval.x, newPointInterval.y);
@@ -207,6 +212,7 @@ namespace Maliang.Ritual
             BuildEffects();
             CacheRods();
             if (candle != null) candle.Haptic(0.6f, 0.12f);
+            Sfx.Play(SfxId.Ignite, PosToWorld(UvToPos(uv)));
             MaliangLog.Info("Burn", $"Scroll caught fire at uv {uv.x:F2},{uv.y:F2}.");
             ritual?.OnBurnStarted();
             Ignited?.Invoke(this);
@@ -221,11 +227,22 @@ namespace Maliang.Ritual
             float before = _clock;
             if (targetClock > _clock)
                 _clock = Mathf.Min(targetClock, _clock + Time.deltaTime * maxClockRate);
-            // How hard the fire is burning: full while it moves at all (a slow job still burns properly), dying down
-            // to embers only while it is held back.
+            // How hard the fire is burning: full while it moves (a slow job still burns properly), a smoulder while it
+            // waits at the hold point.
             float pace = Time.deltaTime > 0f ? (_clock - before) / Time.deltaTime : 0f;
-            _heat = Mathf.Lerp(_heat, Mathf.Clamp01(pace / 0.12f), Time.deltaTime * 2f);
+            float heat = Holding ? 0f : pace > 0.001f ? 1f : 0.3f;
+            _heat = Mathf.Lerp(_heat, heat, Time.deltaTime * 2f);
             Progress = BurnedShare(_clock);
+
+            // A soft pop as each new point catches.
+            for (int i = 1; i < _points.Count; i++)
+            {
+                var p = _points[i];
+                if (p.caught || _clock < p.start) continue;
+                p.caught = true;
+                _points[i] = p;
+                Sfx.Play(SfxId.EmberPop, PosToWorld(p.pos));
+            }
 
             if (_points.Count < MaxPoints && Progress < newPointsUntil && _clock >= _nextPoint)
             {
@@ -374,6 +391,7 @@ namespace Maliang.Ritual
             _light.range = 1.6f;
             _light.intensity = 0f;
             _light.shadows = LightShadows.None;
+            _burnLoop = Sfx.Loop(SfxId.BurnLoop, lightGo.transform); // follows the fire like its light
         }
 
         ParticleSystem MakeSystem(string label, Material mat, int max)
@@ -431,9 +449,7 @@ namespace Maliang.Ritual
             float growing = Mathf.Lerp(0.3f, 1f, _heat); // smaller, fewer flames while the fire is held back
 
             // Lift the effects off the paper towards the viewer, or the paper hides half of every flame.
-            var cam = Camera.main;
-            Vector3 normal = canvas.transform.up;
-            if (cam != null && Vector3.Dot(normal, cam.transform.position - canvas.transform.position) < 0f) normal = -normal;
+            Vector3 normal = FacingNormal();
 
             for (int i = 0; i < tries; i++)
             {
@@ -450,6 +466,7 @@ namespace Maliang.Ritual
             if (tries > 0) edge = budget * samples / tries;
             _frontLength = Mathf.Lerp(_frontLength, edge, Time.deltaTime * 4f);
 
+            Sfx.LoopVolume(_burnLoop, SfxId.BurnLoop, Mathf.Lerp(0.3f, 1f, _heat) * Mathf.Clamp01(_frontLength / 0.35f + 0.25f), 4f);
             if (samples > 0) _light.transform.position = Vector3.Lerp(_light.transform.position, centre / samples, Time.deltaTime * 6f);
             float flicker = 0.75f + 0.5f * Mathf.PerlinNoise(Time.time * 9f, 3.3f);
             _light.intensity = lightIntensity * Mathf.Clamp01(_frontLength / 0.6f) * flicker * (0.5f + 0.5f * burningShare + 0.3f);
@@ -496,13 +513,14 @@ namespace Maliang.Ritual
             _embers.Emit(e, 1);
         }
 
-        void EmitAsh(Vector3 at)
+        void EmitAsh(Vector3 at, bool falling = false)
         {
             float g = UnityEngine.Random.Range(0.08f, 0.3f);
             var e = new ParticleSystem.EmitParams
             {
                 position = at,
-                velocity = Vector3.up * UnityEngine.Random.Range(0.02f, 0.08f) + UnityEngine.Random.insideUnitSphere * 0.02f,
+                velocity = (falling ? Vector3.down * UnityEngine.Random.Range(0.02f, 0.1f) : Vector3.up * UnityEngine.Random.Range(0.02f, 0.08f))
+                           + UnityEngine.Random.insideUnitSphere * 0.02f,
                 startLifetime = UnityEngine.Random.Range(2f, 3.5f),
                 startSize = UnityEngine.Random.Range(0.003f, 0.007f),
                 rotation = UnityEngine.Random.value * 360f,
@@ -511,14 +529,14 @@ namespace Maliang.Ritual
             _ash.Emit(e, 1);
         }
 
-        void EmitSmoke(Vector3 at)
+        void EmitSmoke(Vector3 at, float scale = 1f)
         {
             var e = new ParticleSystem.EmitParams
             {
                 position = at + Vector3.up * 0.02f,
                 velocity = Vector3.up * UnityEngine.Random.Range(0.06f, 0.12f) + UnityEngine.Random.insideUnitSphere * 0.015f,
-                startLifetime = UnityEngine.Random.Range(1.8f, 3f),
-                startSize = UnityEngine.Random.Range(0.04f, 0.09f),
+                startLifetime = UnityEngine.Random.Range(1.8f, 3f) * scale,
+                startSize = UnityEngine.Random.Range(0.04f, 0.09f) * scale,
                 rotation = UnityEngine.Random.value * 360f,
                 startColor = new Color(0.4f, 0.38f, 0.36f, 0.1f),
             };
@@ -564,10 +582,104 @@ namespace Maliang.Ritual
             body.mass = 0.08f;
             body.angularVelocity = UnityEngine.Random.insideUnitSphere * 2f;
             if (s.rod.GetComponent<Collider>() == null) s.rod.gameObject.AddComponent<CapsuleCollider>();
+            var impact = s.rod.GetComponent<ImpactSound>();
+            if (impact == null) impact = s.rod.gameObject.AddComponent<ImpactSound>();
+            impact.sound = SfxId.RodFall;
+            impact.Arm();
             var fade = s.rod.gameObject.AddComponent<FadeAndDestroy>();
             fade.delay = 4f;
             fade.deactivateOnly = true; // kept so a reset can put it back
             MaliangLog.Info("Burn", $"{s.rod.name} fell.");
+        }
+
+        // ------------------------------------------------------------------ failure
+
+        /// <summary>
+        /// Puts the fire out (failure, Phase3Design 7.2): the burn freezes, the glowing edge fades from orange through
+        /// dark red to grey over <paramref name="duration"/>, a few wisps of smoke rise, and the flames and light die.
+        /// </summary>
+        public void Extinguish(float duration = 1.2f)
+        {
+            if (!IsBurning || IsExtinguished) return;
+            IsExtinguished = true;
+            Holding = false;
+            if (_ending != null) StopCoroutine(_ending);
+            _ending = StartCoroutine(ExtinguishRoutine(duration));
+        }
+
+        IEnumerator ExtinguishRoutine(float duration)
+        {
+            float light0 = _light != null ? _light.intensity : 0f;
+            int wisps = 0;
+            for (float t = 0f; t < duration; t += Time.deltaTime)
+            {
+                float k = t / duration;
+                if (_mat != null)
+                {
+                    _mat.SetFloat(CoolId, k);
+                    _mat.SetFloat(GlowGainId, Mathf.Lerp(_glowGain, 1f, k));
+                }
+                if (_light != null) _light.intensity = light0 * (1f - k) * (1f - k);
+                Sfx.LoopVolume(_burnLoop, SfxId.BurnLoop, 0f, 8f);
+                // A few wisps of smoke from the dying edge, mostly at the start.
+                if (_fx != null && wisps < 10 && UnityEngine.Random.value < 0.5f * (1f - k) && SampleFront(out var pos))
+                {
+                    EmitSmoke(PosToWorld(pos) + FacingNormal() * 0.006f, 1.6f);
+                    wisps++;
+                }
+                yield return null;
+            }
+            if (_mat != null) _mat.SetFloat(CoolId, 1f);
+            if (_light != null) _light.intensity = 0f;
+            _ending = null;
+        }
+
+        /// <summary>The failed remnant crumbles to ash over <paramref name="duration"/>; then it is hidden.</summary>
+        public void Crumble(float duration = 1.5f, Action done = null)
+        {
+            if (_ending != null) StopCoroutine(_ending);
+            _ending = StartCoroutine(CrumbleRoutine(duration, done));
+        }
+
+        IEnumerator CrumbleRoutine(float duration, Action done)
+        {
+            if (_fx == null) BuildEffects();
+            if (_light != null) _light.intensity = 0f;
+            if (_burnLoop != null) _burnLoop.volume = 0f;
+            Sfx.Play(SfxId.Crumble, canvas.transform.position);
+            var rods = unroll != null ? new[] { unroll.rodLeft, unroll.rodRight } : new Transform[0];
+            var rodScale = new Vector3[rods.Length];
+            for (int i = 0; i < rods.Length; i++) if (rods[i] != null) rodScale[i] = rods[i].localScale;
+            for (float t = 0f; t < duration; t += Time.deltaTime)
+            {
+                float k = t / duration;
+                if (_mat != null) _mat.SetFloat(CrumbleId, k);
+                for (int i = 0; i < rods.Length; i++)
+                    if (rods[i] != null && rods[i].IsChildOf(transform)) rods[i].localScale = rodScale[i] * (1f - k * k);
+                // Ash falling off the paper as it goes.
+                for (int n = 0; n < 3; n++)
+                {
+                    var pos = new Vector2(UnityEngine.Random.Range(-0.5f, 0.5f) * _size.x, UnityEngine.Random.Range(-0.5f, 0.5f) * _size.y);
+                    EmitAsh(PosToWorld(pos), falling: true);
+                }
+                yield return null;
+            }
+            if (_mat != null) _mat.SetFloat(CrumbleId, 1f);
+            for (int i = 0; i < rods.Length; i++) if (rods[i] != null && rods[i].IsChildOf(transform)) rods[i].localScale = rodScale[i];
+            IsBurning = false;
+            IsBurnedAway = true;
+            if (_fx != null) Destroy(_fx, 4f);
+            _fx = null;
+            _ending = null;
+            done?.Invoke();
+        }
+
+        Vector3 FacingNormal()
+        {
+            var cam = Camera.main;
+            Vector3 normal = canvas.transform.up;
+            if (cam != null && Vector3.Dot(normal, cam.transform.position - canvas.transform.position) < 0f) normal = -normal;
+            return normal;
         }
 
         // ------------------------------------------------------------------ end / reset
@@ -578,6 +690,8 @@ namespace Maliang.Ritual
             IsBurnedAway = true;
             if (_rods != null) for (int i = 0; i < _rods.Length; i++) if (!_rods[i].fallen && _rods[i].rod != null) DropRod(ref _rods[i]);
             if (_light != null) _light.gameObject.AddComponent<FadeAndDestroy>().delay = 0f;
+            Sfx.FadeOut(_burnLoop, 1f);
+            _burnLoop = null;
             if (_fx != null) Destroy(_fx, 4f);
             _fx = null;
             MaliangLog.Info("Burn", "Scroll burned away.");
@@ -588,8 +702,18 @@ namespace Maliang.Ritual
         /// <summary>Back to unburned paper (reset / new round): puts fallen rods back.</summary>
         public void ResetBurn()
         {
+            if (_ending != null) { StopCoroutine(_ending); _ending = null; }
             IsBurning = false;
             IsBurnedAway = false;
+            IsExtinguished = false;
+            Holding = false;
+            _glowGain = 1f;
+            if (_mat != null)
+            {
+                _mat.SetFloat(CoolId, 0f);
+                _mat.SetFloat(CrumbleId, 0f);
+                _mat.SetFloat(GlowGainId, 1f);
+            }
             Progress = TargetProgress = 0f;
             _contact = 0f;
             _clock = 0f;

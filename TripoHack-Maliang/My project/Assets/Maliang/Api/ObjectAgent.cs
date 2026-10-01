@@ -18,7 +18,7 @@ namespace Maliang.Api
     /// tells it the model is on disk (or that a technical failure happened after the verdict), and
     /// <see cref="SoundReady"/> arrives independently.
     /// </summary>
-    public class ObjectJob
+    public class ObjectJob : Maliang.Ritual.IBurnJob
     {
         public string Id;
         public string WorkDir;                 // all files of this job (ink, plan, refined, model, animations, sound)

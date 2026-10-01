@@ -1,4 +1,5 @@
 using System.Collections;
+using Maliang.Core;
 using Maliang.Drawing;
 using UnityEngine;
 
@@ -53,6 +54,7 @@ namespace Maliang.Ritual
         {
             float from = Progress;
             float time = duration * Mathf.Abs(to - from);
+            if (time > 0.2f && canvas != null) Sfx.Play(SfxId.ScrollRoll, canvas.transform.position, Mathf.Clamp01(time / duration));
             for (float t = 0f; t < time; t += Time.deltaTime)
             {
                 SetProgress(Mathf.Lerp(from, to, Mathf.SmoothStep(0f, 1f, t / time)));

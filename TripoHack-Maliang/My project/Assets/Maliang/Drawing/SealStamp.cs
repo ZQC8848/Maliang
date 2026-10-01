@@ -67,6 +67,7 @@ namespace Maliang.Drawing
             {
                 // Not enough ink: the seal refuses to take (TechPlan §5.1). Small bump, nothing printed.
                 Haptic(0.15f, 0.05f);
+                Sfx.Play(SfxId.SealStamp, face.position, 0.25f);
                 return false;
             }
 
@@ -80,6 +81,7 @@ namespace Maliang.Drawing
             canvas.StampSeal(sealTexture, uvA, uvB, uvC, uvD);
 
             Haptic(0.8f, 0.15f);
+            Sfx.Play(SfxId.SealStamp, face.position);
             ritual.OnSealed(type);
             return true;
         }

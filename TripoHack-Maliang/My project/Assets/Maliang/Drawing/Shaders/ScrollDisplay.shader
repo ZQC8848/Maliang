@@ -27,6 +27,9 @@ Shader "Maliang/ScrollDisplay"
         [HDR] _GlowColor ("Glow Colour", Color) = (3.2, 1.15, 0.28, 1)
         _CharColor ("Char Colour", Color) = (0.07, 0.045, 0.03, 1)
         _ScorchColor ("Scorch Colour", Color) = (0.55, 0.36, 0.18, 1)
+        _GlowGain ("Glow Gain (breathing while held)", Range(0, 2)) = 1
+        _Cool ("Cooling (fire put out)", Range(0, 1)) = 0
+        _Crumble ("Crumble To Ash", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -62,6 +65,9 @@ Shader "Maliang/ScrollDisplay"
                 half4 _GlowColor;
                 half4 _CharColor;
                 half4 _ScorchColor;
+                float _GlowGain;
+                float _Cool;
+                float _Crumble;
                 float4 _BurnPoints[MAX_BURN_POINTS];
             CBUFFER_END
 
@@ -123,11 +129,21 @@ Shader "Maliang/ScrollDisplay"
                 half3 col = paper * ink;
                 col = col * (1 - seal.a) + seal.rgb;
 
+                float2 pos = (i.uv - 0.5) * _CanvasSize.xy;
+                // Crumbling remnant: the paper falls apart into ash everywhere, with grey edges.
+                float crumbleEdge = 0;
+                if (_Crumble > 0)
+                {
+                    float n = ValueNoise(pos * 22 + 3.7) * 0.65 + ValueNoise(pos * 64 + 9.1) * 0.35;
+                    float k = n + 0.1 - _Crumble * 1.2;
+                    clip(k);
+                    crumbleEdge = saturate(1 - k / 0.06);
+                }
+
                 int count = (int)_BurnCount;
-                if (count <= 0) return half4(col, 1);
+                if (count <= 0) return half4(lerp(col, half3(0.24, 0.23, 0.22), crumbleEdge), 1);
 
                 // Distance outside the nearest burn circle, in metres.
-                float2 pos = (i.uv - 0.5) * _CanvasSize.xy;
                 float field = 1e5;
                 for (int k = 0; k < MAX_BURN_POINTS; k++)
                 {
@@ -148,10 +164,15 @@ Shader "Maliang/ScrollDisplay"
                 float charK = saturate(1 - (field - _GlowWidth) / max(_CharWidth, 1e-4));
                 col = lerp(col, _CharColor.rgb, smoothstep(0, 1, charK));
                 // Glowing edge, flickering along its length; a few sparks smoulder in the char.
+                // Put out (_Cool): the glow fades orange -> dark red -> nothing, leaving a grey ash rim.
                 float flicker = 0.65 + 0.7 * ValueNoise(pos * 60 + float2(t * 2.3, -t * 1.7));
                 float glow = saturate(1 - field / max(_GlowWidth, 1e-4));
                 float spark = step(0.86, ValueNoise(pos * 420 + t * 0.9)) * charK * (1 - glow);
-                col += _GlowColor.rgb * (glow * glow * flicker + spark * 0.35 * flicker);
+                half3 glowCol = lerp(_GlowColor.rgb * flicker, half3(0.55, 0.06, 0.02), saturate(_Cool * 1.8));
+                float hot = (1 - smoothstep(0.45, 1.0, _Cool)) * _GlowGain;
+                col += glowCol * (glow * glow + spark * 0.35 * (1 - _Cool)) * hot;
+                col = lerp(col, half3(0.3, 0.29, 0.27), glow * glow * smoothstep(0.5, 1.0, _Cool));
+                col = lerp(col, half3(0.24, 0.23, 0.22), crumbleEdge);
                 return half4(col, 1);
             }
             ENDHLSL

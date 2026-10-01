@@ -58,3 +58,4 @@ Thumbs.db
 
 # Local test data (large binaries, not for git)
 TestData/
+Tools/sfx/raw/

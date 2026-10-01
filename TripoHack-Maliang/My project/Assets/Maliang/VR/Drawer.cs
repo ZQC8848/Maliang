@@ -1,3 +1,4 @@
+using Maliang.Core;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Inputs.Haptics;
@@ -8,7 +9,8 @@ namespace Maliang.VR
     /// <summary>
     /// A desk drawer that slides along <see cref="openDirection"/> while the player grabs its front (or pull) and moves
     /// the hand. It is a kinematic rigidbody moved in FixedUpdate, so things lying inside ride along with it.
-    /// A released drawer keeps its momentum and glides to a stop; hitting either end gives a small haptic bump.
+    /// A released drawer keeps its momentum and glides to a stop; hitting either end gives a small haptic bump and a
+    /// knock. While it moves, wood slides on wood, louder the faster it goes.
     /// </summary>
     [RequireComponent(typeof(Rigidbody), typeof(XRSimpleInteractable))]
     public class Drawer : MonoBehaviour
@@ -36,6 +38,7 @@ namespace Maliang.VR
         Transform _hand;
         float _grabHandAlong, _grabOpen;
         HapticImpulsePlayer _haptics;
+        AudioSource _slide;
         bool _atLimit = true;
 
         void Awake()
@@ -47,6 +50,10 @@ namespace Maliang.VR
             openDirection = openDirection.normalized;
             _closedPos = transform.position;
         }
+
+        void Start() => _slide = Sfx.Loop(SfxId.DrawerSlideLoop, transform);
+
+        void Update() => Sfx.LoopVolume(_slide, SfxId.DrawerSlideLoop, Mathf.InverseLerp(0.02f, 0.4f, Mathf.Abs(Velocity)), 18f);
 
         void OnEnable()
         {
@@ -95,7 +102,11 @@ namespace Maliang.VR
 
             float v = (next - prev) / dt;
             bool atLimit = next <= 0f || next >= maxOpen;
-            if (atLimit && !_atLimit && Mathf.Abs(Velocity) > 0.05f) Haptic(0.35f, 0.05f);
+            if (atLimit && !_atLimit && Mathf.Abs(Velocity) > 0.05f)
+            {
+                Haptic(0.35f, 0.05f);
+                Sfx.Play(SfxId.DrawerKnock, transform.position, Mathf.Clamp01(Mathf.Abs(Velocity) / 0.5f));
+            }
             _atLimit = atLimit;
 
             Acceleration = Mathf.Lerp(Acceleration, (v - Velocity) / dt, 0.5f);
