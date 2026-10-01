@@ -1,6 +1,11 @@
 // Scroll surface: paper × ink (multiply), then the seal layer on top (premultiplied alpha).
 // Double-sided so the scroll reads from either side once it levitates.
 // _RevealHalf clips the paper to |u - 0.5| <= _RevealHalf: the strip between the rollers while the scroll unrolls.
+//
+// Burning (Phase 4): up to 16 burn points in canvas metres (xy = position from the centre, z = radius, w = unused).
+// The burn field is the distance outside the nearest circle, roughened by noise. Inside: a hole. Just outside: a
+// glowing edge, then a charred band, then a brown scorch ring. A point with a negative radius has not caught yet:
+// it only shows as a scorch spot that darkens as the radius approaches zero.
 Shader "Maliang/ScrollDisplay"
 {
     Properties
@@ -10,6 +15,18 @@ Shader "Maliang/ScrollDisplay"
         _InkTex ("Ink (RT)", 2D) = "white" {}
         _SealTex ("Seal (RT)", 2D) = "black" {}
         _RevealHalf ("Reveal Half Width (UV)", Range(0, 0.5)) = 0.5
+
+        [Header(Burning)]
+        _CanvasSize ("Canvas Size (m)", Vector) = (0.72, 0.36, 0, 0)
+        _BurnCount ("Burn Point Count", Float) = 0
+        _EdgeNoise ("Edge Roughness (m)", Range(0, 0.04)) = 0.02
+        _NoiseScale ("Edge Noise Scale (1/m)", Float) = 38
+        _GlowWidth ("Glow Width (m)", Range(0, 0.02)) = 0.004
+        _CharWidth ("Char Width (m)", Range(0, 0.05)) = 0.012
+        _ScorchWidth ("Scorch Width (m)", Range(0, 0.1)) = 0.04
+        [HDR] _GlowColor ("Glow Colour", Color) = (3.2, 1.15, 0.28, 1)
+        _CharColor ("Char Colour", Color) = (0.07, 0.045, 0.03, 1)
+        _ScorchColor ("Scorch Colour", Color) = (0.55, 0.36, 0.18, 1)
     }
     SubShader
     {
@@ -25,6 +42,8 @@ Shader "Maliang/ScrollDisplay"
             #pragma multi_compile_instancing
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
+            #define MAX_BURN_POINTS 16
+
             TEXTURE2D(_PaperTex); SAMPLER(sampler_PaperTex);
             TEXTURE2D(_InkTex);   SAMPLER(sampler_InkTex);
             TEXTURE2D(_SealTex);  SAMPLER(sampler_SealTex);
@@ -33,6 +52,17 @@ Shader "Maliang/ScrollDisplay"
                 float4 _PaperTex_ST;
                 half4 _PaperTint;
                 float _RevealHalf;
+                float4 _CanvasSize;
+                float _BurnCount;
+                float _EdgeNoise;
+                float _NoiseScale;
+                float _GlowWidth;
+                float _CharWidth;
+                float _ScorchWidth;
+                half4 _GlowColor;
+                half4 _CharColor;
+                half4 _ScorchColor;
+                float4 _BurnPoints[MAX_BURN_POINTS];
             CBUFFER_END
 
             struct Attributes
@@ -59,6 +89,31 @@ Shader "Maliang/ScrollDisplay"
                 return o;
             }
 
+            // Integer hash of a lattice point. A float hash breaks here: the compiler may evaluate a corner shared by
+            // two cells slightly differently in each, and the hash turns that rounding into visible seams.
+            float Hash(int2 c)
+            {
+                uint2 q = asuint(c) * uint2(1597334673u, 3812015801u);
+                uint n = (q.x ^ q.y) * 1597334673u;
+                return n * (1.0 / 4294967295.0);
+            }
+
+            float ValueNoise(float2 p)
+            {
+                float2 fl = floor(p);
+                int2 i = (int2)fl;
+                float2 f = p - fl;
+                float2 u = f * f * (3.0 - 2.0 * f);
+                float a = Hash(i), b = Hash(i + int2(1, 0)), c = Hash(i + int2(0, 1)), d = Hash(i + int2(1, 1));
+                return lerp(lerp(a, b, u.x), lerp(c, d, u.x), u.y);
+            }
+
+            // Two octaves, roughly -0.5..0.5
+            float EdgeNoise(float2 p)
+            {
+                return ValueNoise(p) * 0.65 + ValueNoise(p * 2.7 + 17.3) * 0.35 - 0.5;
+            }
+
             half4 frag(Varyings i) : SV_Target
             {
                 clip(_RevealHalf - abs(i.uv.x - 0.5));
@@ -67,6 +122,36 @@ Shader "Maliang/ScrollDisplay"
                 half4 seal = SAMPLE_TEXTURE2D(_SealTex, sampler_SealTex, i.uv);
                 half3 col = paper * ink;
                 col = col * (1 - seal.a) + seal.rgb;
+
+                int count = (int)_BurnCount;
+                if (count <= 0) return half4(col, 1);
+
+                // Distance outside the nearest burn circle, in metres.
+                float2 pos = (i.uv - 0.5) * _CanvasSize.xy;
+                float field = 1e5;
+                for (int k = 0; k < MAX_BURN_POINTS; k++)
+                {
+                    if (k >= count) break;
+                    float4 bp = _BurnPoints[k];
+                    field = min(field, distance(pos, bp.xy) - bp.z);
+                }
+                // Fine ragged detail plus broad wobble, so holes do not grow as circles.
+                field += EdgeNoise(pos * _NoiseScale) * _EdgeNoise + EdgeNoise(pos * _NoiseScale * 0.28 + 5.1) * _EdgeNoise * 2.4;
+                clip(field);
+
+                float t = _Time.y;
+                float charEnd = _GlowWidth + _CharWidth;
+                // Scorch: paper browns towards the char band.
+                float scorch = saturate(1 - (field - charEnd) / max(_ScorchWidth, 1e-4));
+                col = lerp(col, col * _ScorchColor.rgb, scorch * scorch * 0.85);
+                // Char: blackened paper (the drawing disappears under it).
+                float charK = saturate(1 - (field - _GlowWidth) / max(_CharWidth, 1e-4));
+                col = lerp(col, _CharColor.rgb, smoothstep(0, 1, charK));
+                // Glowing edge, flickering along its length; a few sparks smoulder in the char.
+                float flicker = 0.65 + 0.7 * ValueNoise(pos * 60 + float2(t * 2.3, -t * 1.7));
+                float glow = saturate(1 - field / max(_GlowWidth, 1e-4));
+                float spark = step(0.86, ValueNoise(pos * 420 + t * 0.9)) * charK * (1 - glow);
+                col += _GlowColor.rgb * (glow * glow * flicker + spark * 0.35 * flicker);
                 return half4(col, 1);
             }
             ENDHLSL

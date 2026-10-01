@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Maliang.Effects
@@ -20,11 +21,17 @@ namespace Maliang.Effects
         [Tooltip("How far the light wanders around the flame (m).")]
         public float lightWander = 0.004f;
 
+        /// <summary>Every enabled flame (the scrolls test these for burning).</summary>
+        public static readonly List<CandleFlame> All = new List<CandleFlame>();
+
         public bool IsLit { get; private set; } = true;
         public Transform Tip => tip != null ? tip : transform;
 
         Vector3 _lightRest;
         float _seed;
+
+        void OnEnable() => All.Add(this);
+        void OnDisable() => All.Remove(this);
 
         void Awake()
         {

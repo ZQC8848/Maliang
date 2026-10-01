@@ -8,6 +8,7 @@ namespace Maliang.Ritual
     /// <summary>
     /// Development shortcuts for the desk: keyboard (editor / desktop) and the left controller's menu button.
     /// R or left menu: reset the scroll.   E: export the ink to TestData/Exports/ as PNG.
+    /// B: set the hovering scroll alight without the candle.
     /// </summary>
     public class DeskDebugKeys : MonoBehaviour
     {
@@ -38,6 +39,20 @@ namespace Maliang.Ritual
                 else ritual.ResetScroll();
             }
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) ExportToTestData();
+            if (Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame) IgniteHovering();
+        }
+
+        /// <summary>Sets the hovering scroll alight at a random spot, without the candle (desktop testing).</summary>
+        [ContextMenu("Ignite Hovering Scroll")]
+        public void IgniteHovering()
+        {
+            foreach (var burn in FindObjectsByType<ScrollBurn>())
+            {
+                if (burn.ritual == null || !burn.ritual.CanIgnite) continue;
+                burn.Ignite(new Vector2(Random.Range(0.2f, 0.8f), Random.Range(0.2f, 0.8f)));
+                return;
+            }
+            MaliangLog.Info("Debug", "No hovering scroll to ignite.");
         }
 
         [ContextMenu("Export Ink To TestData")]

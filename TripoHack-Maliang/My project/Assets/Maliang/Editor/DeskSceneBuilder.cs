@@ -548,6 +548,7 @@ namespace Maliang.EditorTools
             ConfigureGrab(root);
             var pickup = root.AddComponent<ScrollPickup>();
             pickup.grabCollider = box;
+            ScrollBurnBuilder.Add(root);
 
             EnsureFolder(ParentFolder(ScrollPrefabPath));
             var prefab = PrefabUtility.SaveAsPrefabAsset(root, ScrollPrefabPath);

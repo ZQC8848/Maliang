@@ -1,6 +1,8 @@
 // Additive particle shader for the candle flame. No texture: the shape is computed from the particle UVs,
 // either a teardrop (tongue of flame, wide round base tapering to a point) or a soft round blob (glow, embers).
 // Colour and alpha come from the particle vertex colour; _Intensity pushes the core past 1 for a hot look.
+// _Occlusion 0 is purely additive (the candle in the dim room). Above 0 the flame also covers what is behind it,
+// so it still reads against a bright sky (the burning scroll).
 Shader "Maliang/Flame"
 {
     Properties
@@ -8,11 +10,12 @@ Shader "Maliang/Flame"
         [Enum(Teardrop,0,Round,1)] _Shape ("Shape", Float) = 0
         _Intensity ("Intensity", Range(0, 4)) = 1.5
         _Softness ("Edge Softness", Range(0.5, 4)) = 1.6
+        _Occlusion ("Occlusion", Range(0, 1)) = 0
     }
     SubShader
     {
         Tags { "RenderType" = "Transparent" "Queue" = "Transparent" "RenderPipeline" = "UniversalPipeline" "IgnoreProjector" = "True" "PreviewType" = "Plane" }
-        Blend One One
+        Blend One OneMinusSrcAlpha
         ZWrite Off
         Cull Off
 
@@ -29,6 +32,7 @@ Shader "Maliang/Flame"
                 half _Shape;
                 half _Intensity;
                 half _Softness;
+                half _Occlusion;
             CBUFFER_END
 
             struct Attributes
@@ -76,7 +80,7 @@ Shader "Maliang/Flame"
                 }
                 half a = pow(saturate(1 - d), _Softness);
                 half k = a * i.color.a * _Intensity;
-                return half4(i.color.rgb * k, 0);
+                return half4(i.color.rgb * k, saturate(a * i.color.a) * _Occlusion);
             }
             ENDHLSL
         }

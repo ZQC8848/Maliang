@@ -134,7 +134,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 2873847513508380306}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0.5907782, y: -0.38856298, z: -0.38856298, w: 0.5907782}
   m_LocalPosition: {x: 0.37100002, y: 0.006, z: 0}
   m_LocalScale: {x: 0.022, y: 0.18, z: 0.022}
   m_ConstrainProportionsScale: 0
@@ -224,7 +224,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4279872816958908850}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0.5907782, y: 0.38856298, z: 0.38856298, w: 0.5907782}
   m_LocalPosition: {x: -0.37100002, y: 0.006, z: 0}
   m_LocalScale: {x: 0.022, y: 0.18, z: 0.022}
   m_ConstrainProportionsScale: 0
@@ -314,7 +314,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5024441043513660830}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0.5907782, y: -0.38856298, z: -0.38856298, w: 0.5907782}
   m_LocalPosition: {x: 0.37100002, y: 0.006, z: 0}
   m_LocalScale: {x: 0.022, y: 0.20500001, z: 0.022}
   m_ConstrainProportionsScale: 0
@@ -404,7 +404,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 5760564310234690298}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.7071068, y: 0, z: 0, w: 0.7071068}
+  m_LocalRotation: {x: 0.5907782, y: 0.38856298, z: 0.38856298, w: 0.5907782}
   m_LocalPosition: {x: -0.37100002, y: 0.006, z: 0}
   m_LocalScale: {x: 0.022, y: 0.20500001, z: 0.022}
   m_ConstrainProportionsScale: 0
@@ -483,6 +483,7 @@ GameObject:
   - component: {fileID: 5063268086596661823}
   - component: {fileID: 2557446098729907048}
   - component: {fileID: 2529452168175046286}
+  - component: {fileID: 5060725766671831415}
   m_Layer: 0
   m_Name: Scroll
   m_TagString: Untagged
@@ -758,3 +759,36 @@ MonoBehaviour:
   station: {fileID: 0}
   pickableOnStart: 1
   grabCollider: {fileID: 7510450318159257690}
+--- !u!114 &5060725766671831415
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 7324142414113519066}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 6c9e74164aba69d45828df6729a0cbf7, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::Maliang.Ritual.ScrollBurn
+  ritual: {fileID: 3155647621018428805}
+  canvas: {fileID: 4592481988273196375}
+  unroll: {fileID: 2069801067300534834}
+  touchDistance: 0.02
+  igniteTime: 0.35
+  spreadSpeed: 0.03
+  newPointInterval: {x: 1.2, y: 3}
+  jumpShare: 0.65
+  jumpDistance: {x: 0.025, y: 0.1}
+  scorchLead: 2
+  newPointsUntil: 0.85
+  maxClockRate: 4
+  selfTimed: 1
+  selfTimedDuration: 14
+  flameMaterial: {fileID: 2100000, guid: 86735624ef2cb9d4eae89864d9aaf702, type: 2}
+  emberMaterial: {fileID: 2100000, guid: 2eac0fe8efd32e24498e1e4ddbcae2bd, type: 2}
+  ashMaterial: {fileID: 2100000, guid: 7d923fa3fd034af4c9b33683018ace8f, type: 2}
+  smokeMaterial: {fileID: 2100000, guid: 256a2634ac18ec44d9be9ec70cc7a0d3, type: 2}
+  lightColor: {r: 1, g: 0.55, b: 0.25, a: 1}
+  lightIntensity: 1.1
+  flameDensity: 420

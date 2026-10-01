@@ -32,9 +32,10 @@ namespace Maliang.Ritual
     }
 
     /// <summary>
-    /// The scroll's state machine (TechPlan §6.1): Rolled → Unrolled → Levitating.
+    /// The scroll's state machine (TechPlan §6.1): Rolled → Unrolled → Levitating → Burning → Done.
     /// The scroll starts rolled up and unrolls on the desk (<see cref="ScrollUnroll"/>); the seal is the "final" stroke —
-    /// once it lands the drawing locks and the scroll rises to hover in front of the player.
+    /// once it lands the drawing locks and the scroll rises to hover in front of the player. A candle sets it alight
+    /// (<see cref="ScrollBurn"/>); it keeps hovering while it burns, and is gone once it has burned away.
     /// </summary>
     public class ScrollRitual : MonoBehaviour
     {
@@ -96,6 +97,9 @@ namespace Maliang.Ritual
         public event Action Unrolled;
         public event Action<SealType> Sealed;
         public event Action Hovering;
+        public event Action BurnStarted;
+        /// <summary>The paper has burned away (the summoning follows in Phase 5).</summary>
+        public event Action BurnedAway;
         /// <summary>Put back on the desk (reset).</summary>
         public event Action ReturnedToDesk;
 
@@ -110,6 +114,8 @@ namespace Maliang.Ritual
         Transform Head => head != null ? head : (Camera.main != null ? Camera.main.transform : null);
 
         public bool CanSeal => State == ScrollState.Unrolled && canvas.InkCoverage >= minInkCoverage;
+        /// <summary>Sealed and hovering (or held after hovering): a candle can set it alight.</summary>
+        public bool CanIgnite => State == ScrollState.Levitating && IsHovering;
         /// <summary>True once the scroll has left the desk: hovering after its seal, or further on in the ritual.</summary>
         public bool OffDesk => State >= ScrollState.Burning || (State == ScrollState.Levitating && IsHovering);
 
@@ -304,9 +310,30 @@ namespace Maliang.Ritual
             return b;
         }
 
+        // ------------------------------------------------------------------ burning
+
+        /// <summary>Called by <see cref="ScrollBurn"/> when the candle has set the scroll alight.</summary>
+        public void OnBurnStarted()
+        {
+            if (State != ScrollState.Levitating) return;
+            State = ScrollState.Burning;
+            BurnStarted?.Invoke();
+        }
+
+        /// <summary>Called by <see cref="ScrollBurn"/> once the paper is gone: frees the hover spot and hides the scroll.</summary>
+        public void OnBurnedAway()
+        {
+            State = ScrollState.Done;
+            IsHovering = false;
+            IsHeld = false;
+            HasHoverReservation = false;
+            BurnedAway?.Invoke();
+            Root.gameObject.SetActive(false);
+        }
+
         void Update()
         {
-            if (!IsHovering || State != ScrollState.Levitating || IsHeld) return;
+            if (!IsHovering || (State != ScrollState.Levitating && State != ScrollState.Burning) || IsHeld) return;
             _hoverTime += Time.deltaTime;
             float bob = Mathf.Sin(_hoverTime * Mathf.PI * 2f / bobPeriod) * bobAmplitude;
             Root.position = _hoverPos + Vector3.up * bob;
@@ -316,7 +343,10 @@ namespace Maliang.Ritual
         [ContextMenu("Reset Scroll")]
         public void ResetScroll()
         {
+            Root.gameObject.SetActive(true);
             if (_rise != null) { StopCoroutine(_rise); _rise = null; }
+            var burn = GetComponent<ScrollBurn>();
+            if (burn != null) burn.ResetBurn();
             Root.SetPositionAndRotation(_deskPos, _deskRot);
             canvas.ClearAll();
             Seal = null;
