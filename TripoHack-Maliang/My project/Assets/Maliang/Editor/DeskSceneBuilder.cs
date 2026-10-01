@@ -49,8 +49,9 @@ namespace Maliang.EditorTools
         static readonly Vector3 LotusCenter = new Vector3(0f, 0f, 0.45f); // between the player and the desk
         const string StoneAlbedo = "Assets/Maliang/Art/Textures/stone_albedo.png";
         const string StoneNormal = "Assets/Maliang/Art/Textures/stone_normal.png";
-        const string SkyTexture = "Assets/Maliang/Art/Sky/ShanshuiSky.png";   // 2:1 lat-long panorama (Tools/environment/refs)
-        const float SkyFrontU = 0.58f;  // panorama column (0..1) to put straight ahead of the player: the central peaks
+        const string SkyTexture = "Assets/Maliang/Art/Sky/ShanshuiSky.png";   // 8192x4096 lat-long panorama
+        const int SkyMaxSize = 8192;    // keep full resolution: ~22 texels per degree in the headset
+        const float SkyFrontU = 0.45f;  // panorama column (0..1) to put straight ahead of the player: the main peak
         const string ScrollPrefabPath = "Assets/Maliang/Prefabs/Scroll.prefab";
         const string ScrollQuadPath = "Assets/Maliang/Art/Desk/ScrollQuad.asset";
         static readonly Vector2 SpareScrollXZ = new Vector2(0f, 0.97f); // rolled spare, lying across the back of the desk
@@ -122,7 +123,7 @@ namespace Maliang.EditorTools
             {
                 sun.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
                 sun.intensity = 1.1f;
-                sun.color = new Color(1f, 0.95f, 0.86f);
+                sun.color = new Color(1f, 0.965f, 0.92f); // the panorama's cream (R +3%, B -4% against G)
                 sun.shadows = LightShadows.Soft;
             }
 
@@ -185,10 +186,14 @@ namespace Maliang.EditorTools
 
             report.Add(SetupSky());
 
+            // Ambient to match the sky: the hues are the panorama's measured band averages (above the horizon,
+            // around it, the cloud sea below), all a bright warm cream; levels are toned down so the desk keeps
+            // its shading, but kept high because everything sits in bright mist. Trilight rather than Skybox
+            // ambient so a build looks the same without baked lighting data.
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
-            RenderSettings.ambientSkyColor = new Color(0.55f, 0.55f, 0.6f);
-            RenderSettings.ambientEquatorColor = new Color(0.4f, 0.37f, 0.33f);
-            RenderSettings.ambientGroundColor = new Color(0.15f, 0.13f, 0.12f);
+            RenderSettings.ambientSkyColor = new Color(0.637f, 0.62f, 0.596f);
+            RenderSettings.ambientEquatorColor = new Color(0.514f, 0.5f, 0.48f);
+            RenderSettings.ambientGroundColor = new Color(0.31f, 0.3f, 0.286f);
 
             EditorSceneManager.SaveScene(scene, ScenePath);
             AddToBuildSettings(ScenePath);
@@ -207,7 +212,7 @@ namespace Maliang.EditorTools
             if (AssetImporter.GetAtPath(SkyTexture) is TextureImporter ti)
             {
                 bool dirty = ti.mipmapEnabled || ti.wrapModeU != TextureWrapMode.Repeat || ti.wrapModeV != TextureWrapMode.Clamp ||
-                             ti.maxTextureSize < 2048 || ti.textureCompression != TextureImporterCompression.CompressedHQ;
+                             ti.maxTextureSize != SkyMaxSize || ti.textureCompression != TextureImporterCompression.CompressedHQ;
                 if (dirty)
                 {
                     ti.textureType = TextureImporterType.Default;
@@ -216,7 +221,7 @@ namespace Maliang.EditorTools
                     ti.wrapModeU = TextureWrapMode.Repeat;
                     ti.wrapModeV = TextureWrapMode.Clamp;
                     ti.filterMode = FilterMode.Bilinear;
-                    ti.maxTextureSize = 2048;
+                    ti.maxTextureSize = SkyMaxSize;
                     ti.textureCompression = TextureImporterCompression.CompressedHQ;
                     ti.SaveAndReimport();
                 }
