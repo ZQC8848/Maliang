@@ -8,7 +8,8 @@
   "tripo": {
     "apiKey": "",
     "creatureModel": "P1-20260311",
-    "staticModel": "v3.1-20260211"
+    "staticModel": "v3.1-20260211",
+    "staticFaceLimit": 50000
   },
   "vision": {
     "provider": "openai",

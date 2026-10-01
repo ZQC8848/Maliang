@@ -124,21 +124,21 @@ related: "TechPlan.md, Phase3Design.md"
 - [x] P1-20260311 与 v3.1-20260211 的模型质量、面数对比:维持生物 P1、静态 v3.1 限面数(模型不需要水墨风格)
 - [ ] gpt-image-2.5-sunburst 精修 5 张测试画:主体与颜色特征是否保留、姿势要求是否遵守(精修图不需要水墨风格;已测 2 张)
 - [x] 识别尺度:20 张合成测试画,清楚和写意 15 张全部成功,乱涂 3/5 失败(另 2 张被宽松解读);之后用 VR 真实画补测
-- [ ] Windows 打包版运行时解码 ElevenLabs 的 MP3
+- [ ] Windows 打包版运行时解码 ElevenLabs 的 MP3(编辑器里已通过)
 
 **实现:**
 - [x] 用我们的 OpenAI key 查 `/v1/models`,定下 GPT 文本模型型号(D10):`gpt-6.1-sol`
-- [ ] `Http`:超时、有限次指数退避重试、错误归类到 `FailReason`(unreachable / exhausted / forbidden / collapsed)
-- [ ] `VisionClient`:水墨 PNG + 印章类型 + 能力表 → 严格结构化输出 `VisionPlan`(`ok` / `fail` 二选一);提示词放 `StreamingAssets/Prompts/vision_object.txt`;按允许列表校验返回内容
-- [ ] `ImageRefineClient`:`/v1/images/edits` + `gpt-image-2.5-sunburst`,出错跳过
-- [ ] `TripoClient`:上传 → 建模 → 轮询 → 立即下载;rig-check(免费)→ rig(人形 v1.0、其他 v2.5)→ retarget(烘焙动画、原地播放)
-- [ ] 绑骨把关:GPT「该不该动」×预检「能不能动」;鸟类不绑骨;绑骨或套动作出错退回静态模型
-- [ ] `SoundClient`:ElevenLabs `eleven_text_to_sound_v2`,和建模并行,出错就无声(需要 ElevenLabs key)
-- [ ] `ObjectAgent` + `ObjectJob`:编排各步骤、并行声音、结果判定、失败归类;盖章时启动
-- [ ] `ObjectSpawner`:载入 GLB、统一尺寸、可抓取、播放动画或 `ProceduralMotion`(静态浮动 / 鸟类飞行)、声音触发(化形时 / 被抓时 / 循环)
-- [ ] `maliang.config.json` 新增 `sound`、`library` 配置段,`imageGen` 与 `tripo` 加模型字段
-- [ ] 编辑器测试入口:选一张 PNG,不进头显跑完整条管线,产物写到 `TestData/Agent/`
-- [ ] 会话内生成次数限额
+- [x] `Http`:超时、有限次指数退避重试、错误归类到 `FailReason`(unreachable / exhausted / forbidden / collapsed)
+- [x] `VisionClient`:水墨 PNG + 印章类型 + 能力表 → 严格结构化输出 `VisionPlan`(`ok` / `fail` 二选一);提示词放 `StreamingAssets/Prompts/vision_object.txt`;按允许列表校验返回内容
+- [x] `ImageRefineClient`:`/v1/images/edits` + `gpt-image-2.5-sunburst`,出错跳过
+- [x] `TripoClient`:上传 → 建模 → 轮询 → 立即下载;rig-check(免费)→ rig(人形 v1.0、其他 v2.5)→ retarget(烘焙动画、原地播放)
+- [x] 绑骨把关:GPT「该不该动」×预检「能不能动」;鸟类不绑骨;绑骨或套动作出错退回静态模型
+- [x] `SoundClient`:ElevenLabs `eleven_text_to_sound_v2`,和建模并行,出错就无声(需要 ElevenLabs key)
+- [x] `ObjectAgent` + `ObjectJob`:编排各步骤、并行声音、结果判定、失败归类;盖章时启动
+- [x] `ObjectSpawner`:载入 GLB、统一尺寸、可抓取、播放动画或 `ProceduralMotion`(静态浮动 / 鸟类飞行)、声音触发(化形时 / 被抓时 / 循环)
+- [x] `maliang.config.json` 新增 `sound`、`library` 配置段,`imageGen` 与 `tripo` 加模型字段
+- [x] 编辑器测试入口:选一张 PNG,不进头显跑完整条管线,产物写到 `TestData/Agent/`(菜单 Maliang/Agent;老虎实测 2 分 41 秒跑通,运行模式生成后动画、声音、抓取正常)
+- [x] 会话内生成次数限额
 
 **验收:** 画清楚的人、马、鱼各自得到会动的物体;画鹤得到带程序飞行的静态模型;画灯笼得到静态物体;至少一个有合适的声音;乱涂的画返回 `fail`;各类失败都能正确归类。
 
