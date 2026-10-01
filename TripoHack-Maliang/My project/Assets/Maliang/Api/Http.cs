@@ -39,6 +39,15 @@ namespace Maliang.Api
             int timeoutSec = DefaultTimeoutSec, CancellationToken cancel = default) =>
             SendAsync(() => UnityWebRequest.Get(url), headers, timeoutSec, cancel);
 
+        /// <summary>Uploads raw bytes (a signed upload URL).</summary>
+        public static Task<byte[]> PutAsync(string url, Dictionary<string, string> headers, byte[] body,
+            int timeoutSec = DefaultTimeoutSec, CancellationToken cancel = default) =>
+            SendAsync(() => new UnityWebRequest(url, "PUT")
+            {
+                uploadHandler = new UploadHandlerRaw(body),
+                downloadHandler = new DownloadHandlerBuffer(),
+            }, headers, timeoutSec, cancel);
+
         public static async Task<string> PostJsonTextAsync(string url, Dictionary<string, string> headers, string json,
             int timeoutSec = DefaultTimeoutSec, CancellationToken cancel = default) =>
             Encoding.UTF8.GetString(await PostJsonAsync(url, headers, json, timeoutSec, cancel));

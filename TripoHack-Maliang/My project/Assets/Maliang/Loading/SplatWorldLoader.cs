@@ -25,6 +25,30 @@ namespace Maliang.Loading
     /// </summary>
     public class SplatWorldLoader : MonoBehaviour
     {
+        /// <summary>
+        /// Render queue for splats: in the transparent pass, but always before every other transparent (particles,
+        /// flames, ash, text are 3000+). Gsplat draws its splats as one transparent object at queue 3000 sorted by the
+        /// distance of the whole world's bounds, and neither splats nor particles write depth, so a far splat could
+        /// be drawn after (over) a near effect. Drawn first, the splats are the backdrop the effects always sit on;
+        /// opaque objects still hide splats behind them through the depth test.
+        /// </summary>
+        public const int SplatRenderQueue = 2950;
+
+        /// <summary>Puts every Gsplat material (all SH bands and render orders) at <paramref name="baseQueue"/> + order.</summary>
+        public static void ApplyRenderQueue(GsplatAsset asset, int baseQueue = SplatRenderQueue)
+        {
+            if (asset == null) return;
+            var materials = asset.Materials;
+            for (int order = 0; order < materials.Length; order++)
+                if (materials[order] != null) materials[order].renderQueue = baseQueue + order;
+        }
+
+        /// <summary>The render queue of this world's splats (tests compare it with Gsplat's own 3000).</summary>
+        public void SetRenderQueue(int baseQueue) => ApplyRenderQueue(_asset, baseQueue);
+
+        /// <summary>Loads a World Labs SPZ (their frame is right-down-forward, OpenCV style).</summary>
+        public void LoadSpz(string spzPath) => LoadSpz(spzPath, SourceCoordinates.RDF);
+
         [Tooltip("Parent of the splat renderer and collider. Alignment is applied to this transform.")]
         public Transform worldRoot;
 
@@ -40,6 +64,18 @@ namespace Maliang.Loading
         /// <summary>True once the renderer has a valid asset and has started uploading/drawing.</summary>
         public bool IsRendering => _renderer != null && _renderer.isActiveAndEnabled && _renderer.Valid;
         public Vector3 BoundsSize => _renderer != null && _renderer.Valid ? _renderer.Bounds.size : Vector3.zero;
+        /// <summary>
+        /// How far the splats have bloomed (0 = every Gaussian shrunk to nothing, 1 = full size): the world grows in
+        /// out of thin air, or fades away, without going dark.
+        /// </summary>
+        public float Bloom
+        {
+            get => _renderer != null ? 1f - _renderer.SplatDownscaleFactor : 0f;
+            set { if (_renderer != null) _renderer.SplatDownscaleFactor = 1f - Mathf.Clamp01(value); }
+        }
+
+        /// <summary>World-space bounds of the splats: what the transparent pass sorts the whole world by.</summary>
+        public Bounds WorldBounds => _renderer != null && _renderer.Valid ? GsplatUtils.CalcWorldBounds(_renderer.Bounds, _renderer.transform) : default;
 
         Transform Root => worldRoot != null ? worldRoot : transform;
 
@@ -63,6 +99,7 @@ namespace Maliang.Loading
             var old = _asset;
             _renderer.GsplatAsset = asset;
             _asset = asset;
+            ApplyRenderQueue(asset);
             if (old != null) Destroy(old);
 
             LoadedSplats = (int)asset.SplatCount;

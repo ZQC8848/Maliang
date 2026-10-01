@@ -78,6 +78,21 @@ namespace Maliang.Api
         [JsonIgnore] public bool Ok => Status == "ok";
     }
 
+    /// <summary>The 「境」 reading (vision_world.schema.json).</summary>
+    public class WorldPlan
+    {
+        [JsonProperty("status")] public string Status;
+        [JsonProperty("reason")] public string Reason;
+        [JsonProperty("seen")] public string Seen;
+        [JsonProperty("confidence")] public float? Confidence;
+        [JsonProperty("subject")] public string Subject;
+        [JsonProperty("refine_prompt")] public string RefinePrompt;
+        [JsonProperty("world_prompt")] public string WorldPrompt;
+        [JsonProperty("ambience_prompt")] public string AmbiencePrompt;
+
+        [JsonIgnore] public bool Ok => Status == "ok";
+    }
+
     public class AnimationPlan
     {
         [JsonProperty("wanted")] public bool Wanted;

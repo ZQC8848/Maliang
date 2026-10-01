@@ -85,6 +85,55 @@ namespace Maliang.Library
             return entry;
         }
 
+        /// <summary>A 「境」 work: the layers, the world's splats, its reference image and how to place it.</summary>
+        internal static LibraryEntry CommitWorld(PendingWork work, WorldJob job)
+        {
+            var entry = new LibraryEntry
+            {
+                schemaVersion = SchemaVersion,
+                id = work.Id,
+                createdAt = DateTime.UtcNow.ToString("yyyy-MM-ddTHH:mm:ssZ"),
+                seal = work.Seal.ToString(),
+                subject = job.Plan?.Subject,
+                category = "world",
+                files = new LibraryFiles { ink = "ink.png", seal = "seal.png" },
+                world = new LibraryWorld
+                {
+                    splatSize = job.SpzSize,
+                    metricScale = job.MetricScale,
+                    groundOffset = job.GroundOffset,
+                    worldId = job.WorldId,
+                    marbleUrl = job.MarbleUrl,
+                    caption = job.Caption,
+                    model = job.Model,
+                },
+            };
+            Copy(job.SpzPath, work.Dir, entry.files.world = "world.spz");
+            if (Copy(job.RefinedPath, work.Dir, "refined.png")) entry.files.refined = "refined.png";
+            if (Copy(job.AmbiencePath, work.Dir, "ambience.mp3")) entry.files.ambience = "ambience.mp3";
+            if (Copy(Path.Combine(work.AgentDir, "plan.json"), work.Dir, "plan.json")) entry.files.plan = "plan.json";
+            WriteEntry(work.Dir, entry);
+
+            string final = Path.Combine(Root, entry.id);
+            Directory.Move(work.Dir, final);
+            entry.Dir = final;
+            AddToIndex(entry);
+            MaliangLog.Info("Library", $"Saved world \"{entry.subject}\" as {entry.id} ({job.SpzSize}, " +
+                                       $"{new FileInfo(Path.Combine(final, "world.spz")).Length / 1048576f:F1} MB)");
+            Added?.Invoke(entry);
+            return entry;
+        }
+
+        /// <summary>Gives a saved 「境」 work its ambience loop (works saved before ambience existed).</summary>
+        public static void AddAmbience(LibraryEntry entry, byte[] mp3)
+        {
+            if (entry?.Dir == null || mp3 == null) return;
+            File.WriteAllBytes(Path.Combine(entry.Dir, "ambience.mp3"), mp3);
+            entry.files.ambience = "ambience.mp3";
+            WriteEntry(entry.Dir, entry);
+            MaliangLog.Info("Library", $"Ambience added to {entry.id}");
+        }
+
         /// <summary>A sound that arrived after the work was saved: added to it (Phase3Design 8.3).</summary>
         public static void AddSound(LibraryEntry entry, string soundPath)
         {
@@ -251,6 +300,9 @@ namespace Maliang.Library
         /// <summary>The summoning succeeded: the work moves into the library.</summary>
         public LibraryEntry Commit(ObjectJob job) => ArtLibrary.Commit(this, job);
 
+        /// <summary>The world was raised: the work moves into the library.</summary>
+        public LibraryEntry Commit(WorldJob job) => ArtLibrary.CommitWorld(this, job);
+
         /// <summary>The summoning failed: nothing is kept.</summary>
         public void Discard()
         {
@@ -279,7 +331,7 @@ namespace Maliang.Library
         public string category;
         public LibraryFiles files = new LibraryFiles();
         [JsonProperty("object")] public LibraryObject @object;
-        public object world;
+        public LibraryWorld world;
 
         /// <summary>The work's folder (not saved).</summary>
         [JsonIgnore] public string Dir;
@@ -294,6 +346,11 @@ namespace Maliang.Library
             if (string.IsNullOrEmpty(files.ink) || string.IsNullOrEmpty(files.seal)) missing.Add("layers");
             Need(files.ink);
             Need(files.seal);
+            if (seal == SealType.World.ToString())
+            {
+                if (string.IsNullOrEmpty(files.world)) missing.Add("world");
+                Need(files.world);
+            }
             if (seal == SealType.Object.ToString())
             {
                 if (string.IsNullOrEmpty(files.model)) missing.Add("model");
@@ -306,7 +363,9 @@ namespace Maliang.Library
 
     public class LibraryFiles
     {
-        public string ink, seal, model, sound, refined, plan;
+        public string ink, seal, model, sound, refined, plan, world;
+        /// <summary>A 「境」 work's looping ambience (optional: a replay without it is simply quiet).</summary>
+        public string ambience;
         public string[] clips = new string[0];
     }
 
@@ -316,6 +375,18 @@ namespace Maliang.Library
         public string[] animations = new string[0];
         public float sizeM = 0.4f;
         public LibrarySound sound;
+    }
+
+    /// <summary>A 「境」 work's world: how it was made and how to place it (Phase3Design 8.2).</summary>
+    public class LibraryWorld
+    {
+        public string splatSize;
+        public float? metricScale;
+        public float? groundOffset;
+        public string worldId;
+        public string marbleUrl;
+        public string caption;
+        public string model;
     }
 
     public class LibrarySound

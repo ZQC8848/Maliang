@@ -421,13 +421,23 @@ namespace Maliang.Ritual
             Root.gameObject.SetActive(false);
         }
 
-        /// <summary>The summoned object (built hidden while the scroll burned) appears where the scroll is. Once.</summary>
+        /// <summary>
+        /// What the burn was for, once: the summoned object (built hidden while the scroll burned) appears where the
+        /// scroll is, and any other outcome happens (a world rises, the sky returns).
+        /// </summary>
         void RevealPrepared(string why, bool warn = false)
         {
-            if (_revealed || !(Job is IPreparedSummon summon)) return;
+            if (_revealed) return;
+            if (Job is IBurnOutcome outcome)
+            {
+                _revealed = true;
+                MaliangLog.Info("Ritual", $"Scroll {Tag} {why}: {Job}");
+                outcome.Apply(this);
+            }
+            if (!(Job is IPreparedSummon summon)) return;
             if (summon.Prepared == null)
             {
-                MaliangLog.Warn("Spawn", $"Scroll {Tag} {why}, but its job has no object ready ({Job})");
+                if (!(Job is IBurnOutcome)) MaliangLog.Warn("Spawn", $"Scroll {Tag} {why}, but its job has no object ready ({Job})");
                 return;
             }
             _revealed = true;
@@ -543,6 +553,7 @@ namespace Maliang.Ritual
             if (_message != null) { _message.Hide(); _message = null; }
             if (Job is ReplayJob replay) replay.Cancel();
             if (Job is SummonJob summoning) summoning.Cancel();
+            if (Job is WorldSummonJob world) world.Cancel();
             Job = null;
             IsReplay = false;
             _revealed = false;

@@ -35,7 +35,35 @@ namespace Maliang.Api
             string system = File.ReadAllText(Path.Combine(PromptDir, "vision_object.txt"))
                 .Replace("{{CAPABILITIES}}", Capabilities.PromptJson);
             var schema = JObject.Parse(File.ReadAllText(Path.Combine(PromptDir, "vision_object.schema.json")));
+            var started = Time.realtimeSinceStartup;
+            var plan = JsonConvert.DeserializeObject<VisionPlan>(await RequestAsync(system, schema, inkPng, seal, cancel));
+            Validate(plan);
+            MaliangLog.Info("Vision", $"{plan.Status} in {Time.realtimeSinceStartup - started:F1}s: " +
+                (plan.Ok ? $"{plan.Subject} [{plan.Category}]" : $"{plan.Reason}") + $" @ {plan.Confidence:F2} (seen: {plan.Seen})");
+            return plan;
+        }
 
+        /// <summary>The 「境」 reading (Phase 6): which place the drawing shows, as a realistic landscape to grow a world from.</summary>
+        public async Task<WorldPlan> PlanWorldAsync(byte[] inkPng, CancellationToken cancel = default)
+        {
+            string system = File.ReadAllText(Path.Combine(PromptDir, "vision_world.txt"));
+            var schema = JObject.Parse(File.ReadAllText(Path.Combine(PromptDir, "vision_world.schema.json")));
+            var started = Time.realtimeSinceStartup;
+            var plan = JsonConvert.DeserializeObject<WorldPlan>(await RequestAsync(system, schema, inkPng, "WORLD", cancel));
+            float min = _config.vision.minConfidence;
+            if (plan.Ok && (plan.Confidence ?? 1f) < min)
+            {
+                MaliangLog.Info("Vision", $"'{plan.Subject}' at confidence {plan.Confidence:F2} < {min:F2}: unrecognizable");
+                plan.Status = "fail";
+                plan.Reason = "unrecognizable";
+            }
+            MaliangLog.Info("Vision", $"world {plan.Status} in {Time.realtimeSinceStartup - started:F1}s: " +
+                (plan.Ok ? plan.Subject : plan.Reason) + $" @ {plan.Confidence:F2} (seen: {plan.Seen})");
+            return plan;
+        }
+
+        async Task<string> RequestAsync(string system, JObject schema, byte[] inkPng, string seal, CancellationToken cancel)
+        {
             var body = new JObject
             {
                 ["model"] = _config.vision.model,
@@ -58,14 +86,8 @@ namespace Maliang.Api
                 },
             };
 
-            var started = Time.realtimeSinceStartup;
             string reply = await Http.PostJsonTextAsync(Endpoint, Auth, body.ToString(Formatting.None), 90, cancel);
-            string text = ExtractOutputText(JObject.Parse(reply));
-            var plan = JsonConvert.DeserializeObject<VisionPlan>(text);
-            Validate(plan);
-            MaliangLog.Info("Vision", $"{plan.Status} in {Time.realtimeSinceStartup - started:F1}s: " +
-                (plan.Ok ? $"{plan.Subject} [{plan.Category}]" : $"{plan.Reason}") + $" @ {plan.Confidence:F2} (seen: {plan.Seen})");
-            return plan;
+            return ExtractOutputText(JObject.Parse(reply));
         }
 
         Dictionary<string, string> Auth => new Dictionary<string, string> { ["Authorization"] = "Bearer " + _config.vision.apiKey };

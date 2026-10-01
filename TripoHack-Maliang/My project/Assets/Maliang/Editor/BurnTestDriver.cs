@@ -40,6 +40,8 @@ namespace Maliang.EditorTools
         static bool _real;              // the real agent (spends credits) instead of a fake job
         static bool _forcedBefore;
         static string _image;           // a picture to put on the scroll instead of the painted test drawing
+        static SealType _seal = SealType.Object;
+        static string _shelfScroll;     // burn this scroll from a drawer (by name) instead of the spare
         static Camera _capture;
 
         [MenuItem("Maliang/Debug/Burn Test/Success (Play Mode)")]
@@ -72,6 +74,28 @@ namespace Maliang.EditorTools
             _image = imagePath;
         }
 
+        /// <summary>The real 「境」 summoning (GPT, refine, World Labs; spends credits): the world rises around the throne.</summary>
+        [MenuItem("Maliang/Debug/Burn Test/Real World - Uses API Credits (Play Mode)")]
+        static void RunRealWorldMenu() => RunRealWorld();
+
+        public static void RunRealWorld(string imagePath = null)
+        {
+            Start(new FakeJobSettings(), "RealWorld" + (imagePath != null ? "_" + Path.GetFileNameWithoutExtension(imagePath) : ""));
+            _real = true;
+            _image = imagePath;
+            _seal = SealType.World;
+        }
+
+        /// <summary>
+        /// Takes the drawer scroll whose name contains <paramref name="nameContains"/> (e.g. "Sky", "lake"), lays it on the
+        /// desk and burns it as it is: a library replay, or the sky scroll clearing the world.
+        /// </summary>
+        public static void RunShelfScroll(string nameContains)
+        {
+            Start(new FakeJobSettings(), "Shelf_" + nameContains);
+            _shelfScroll = nameContains;
+        }
+
         /// <summary>A replayed scroll (fixed 10 s burn) with a stand-in load of <paramref name="loadSeconds"/>.</summary>
         public static void RunReplay(float loadSeconds, bool faded)
         {
@@ -93,6 +117,8 @@ namespace Maliang.EditorTools
             _replayLoad = -1f;
             _real = false;
             _image = null;
+            _seal = SealType.Object;
+            _shelfScroll = null;
             _forcedBefore = FakeJob.Forced;
             _step = Step.LayDown;
             _shot = _failShot = 0;
@@ -118,13 +144,28 @@ namespace Maliang.EditorTools
             switch (_step)
             {
                 case Step.LayDown:
-                    if (station.spare == null) return;
-                    station.spare.transform.position = station.transform.position + Vector3.up * 0.05f;
-                    _scroll = station.spare.Ritual;
-                    if (station.TryAccept(station.spare)) Next(Step.WaitUnrolled);
+                    var pickup = _shelfScroll != null ? FindShelfScroll(_shelfScroll) : station.spare;
+                    if (pickup == null)
+                    {
+                        if (_shelfScroll != null) { Debug.LogError($"[BurnTest] no drawer scroll named *{_shelfScroll}*"); Stop(); }
+                        return;
+                    }
+                    pickup.transform.position = station.transform.position + Vector3.up * 0.05f;
+                    _scroll = pickup.Ritual;
+                    if (station.TryAccept(pickup)) Next(Step.WaitUnrolled);
                     break;
 
                 case Step.WaitUnrolled:
+                    if (_shelfScroll != null)
+                    {
+                        // A library scroll rises by itself once unrolled.
+                        if (_scroll.State != ScrollState.Unrolled && _scroll.State != ScrollState.Levitating) return;
+                        _seal = _scroll.Seal ?? SealType.Object;
+                        _burn = _scroll.GetComponent<ScrollBurn>();
+                        _pacer = _scroll.GetComponent<BurnPacer>();
+                        Next(Step.WaitHover);
+                        break;
+                    }
                     if (_scroll.State != ScrollState.Unrolled) return;
                     if (_image != null) PaintImage(_scroll.canvas, _image);
                     else CanvasTestPainter.PaintMountainScene(_scroll.canvas, Object.FindAnyObjectByType<BrushPen>().CurrentStyle);
@@ -133,7 +174,7 @@ namespace Maliang.EditorTools
                     {
                         FakeJob.Settings = _settings;
                         FakeJob.Forced = !_real; // fake tests never reach the API
-                        _scroll.OnSealed(SealType.Object);
+                        _scroll.OnSealed(_seal);
                         FakeJob.Forced = _forcedBefore;
                         Debug.Log($"[BurnTest] job: {_scroll.Job}");
                     }
@@ -201,8 +242,8 @@ namespace Maliang.EditorTools
                     break;
 
                 case Step.Reveal:
-                    // The summoned object (if any) grows out of the embers where the scroll was.
-                    if (Time.time - _stepTime < 1.2f) return;
+                    // The summoned object (if any) grows out of the embers where the scroll was; a world blooms around.
+                    if (Time.time - _stepTime < (_seal == SealType.World ? 4.5f : 1.2f)) return;
                     Capture("summoned.png");
                     Stop();
                     break;
@@ -215,6 +256,15 @@ namespace Maliang.EditorTools
             EditorApplication.update -= Tick;
             if (_capture != null) Object.Destroy(_capture.gameObject);
             _capture = null;
+        }
+
+        static ScrollPickup FindShelfScroll(string nameContains)
+        {
+            foreach (var r in Object.FindObjectsByType<ScrollRitual>())
+                if (r.name.StartsWith("Library Scroll") && r.name.IndexOf(nameContains, System.StringComparison.OrdinalIgnoreCase) >= 0
+                    && r.State == ScrollState.Rolled)
+                    return r.GetComponent<ScrollPickup>();
+            return null;
         }
 
         /// <summary>Draws a picture onto the scroll's ink layer, full height, centred, white either side.</summary>

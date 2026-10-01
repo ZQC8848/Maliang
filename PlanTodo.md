@@ -194,18 +194,27 @@ related: "TechPlan.md, Phase3Design.md"
 
 ## 阶段 6(M5):「境」全流程
 
-- [ ] `WorldLabsClient`:`prepare_upload` → 签名 URL 上传 → `worlds:generate` → 轮询 operation → 取 world 资源与语义元数据(**以官方文档核对字段**)
-- [ ] `vision_world.txt` 提示词:环境、空间结构、建筑、地貌、天气、时间、颜色、氛围 → Environment Prompt
-- [ ] 下载 SPZ + 碰撞体 GLB,**立即落盘**到 `persistentDataPath`
-- [ ] `SplatWorldLoader` + `WorldAligner`:套阶段 1 得到的变换参数
-- [ ] 进入世界:燃尽 → 桌面场景淡出/溶解 → 玩家出现在世界地面 → 传送移动
-- [ ] 设计并实现**退出方式**(TechPlan §14 待设计)
-- [ ] 进入世界时隐藏/卸载桌面房间,避免叠加
-- [ ] 点数档位可配置(`full_res` / `500k`)
-- [ ] 验证碰撞体是否含在生成结果内、账单与计费
-- [ ] 「境」作品写入作品库(splat、碰撞体、对齐参数、语义信息),右抽屉回放后进入同一个世界;实测 splat 体积并定 `library.maxDiskMB` 默认值
+**构思(2026-10-01 定,取代 TechPlan §8.3 的「进入世界」):** 场景始终只有莲花宝座(书桌平台),玩家不传送、不离开。盖「境」印烧尽后,生成的 splat 世界以莲花台为中心铺开,盖住天空盒,书桌仍在原处;不需要碰撞体和传送移动,也就没有「退出世界」。要恢复原来的天空,烧掉右抽屉最左侧那卷固定的「天」卷轴:展开是天空盒的画面,烧尽后关闭 splat、回到山水天空。
 
-**验收:** 玩家可站在生成的世界里移动,并能回到桌面。
+**渲染层级(重点):** Gsplat 把整片 splat 当成一个透明物体、按整个世界包围盒的距离和粒子一起排序,两者都不写深度,远处的 splat 可能画在近处特效之上。改为 splat 材质队列 2950(透明阶段里固定先于所有 3000 的粒子、火焰、灰烬、文字),特效永远压在 splat 之上;不透明物体仍按深度遮挡 splat。
+
+- [x] Splat 渲染队列 2950(`SplatWorldLoader.ApplyRenderQueue`,每次加载后设置)
+- [x] 实测层级:真实世界(230 万 splat)在场时烧「天」卷轴,火边、火星、烟都画在湖景前面,没有被远处 splat 盖住(`TestData/Burn/153540_Shelf_Sky/`)
+- [x] World Labs API 核对(官方文档 + OpenAPI):`WLT-Api-Key`;`media-assets:prepare_upload` → 签名 URL PUT → `worlds:generate`(image_prompt + text_prompt)→ `operations/{id}` 轮询 → `response` 为 World(`assets.splats.spz_urls{100k,500k,full_res}`、`semantics_metadata{metric_scale_factor, ground_plane_offset}`)。计费:marble-1.1 图生世界 1,580 积分;草稿 marble-1.0-draft 230 积分;key 已验证(余额 35,340)
+- [x] `WorldLabsClient`(C#)+ Python 实测草稿生成:生成约 25 秒;full_res 约 25 MB / 228 万 splat,500k 6 MB,100k 1.3 MB;草稿无 semantics,原点在眼高,正前方 +Z 即生成视角
+- [x] `vision_world` 提示词:识别画中的地方(山水、建筑、天气、时间、氛围)→ 写实风景精修提示词 + World Labs 文本提示词;与「物」相同的严格度和失败原因
+- [x] 精修:写实风景、横幅(1536x1024),不要水墨感;精修失败时直接用原画
+- [x] `WorldJob`:盖「境」印 → 存层 → 导出 → GPT → 精修 → 上传 → 生成 → 轮询 → 下载 SPZ(档位可配)→ 写入作品库 → 完成;燃烧节奏同「物」(40% 等待点、跟随进度)
+- [x] `WorldStage`:烧尽时以莲花台为中心加载 splat(套 `metric_scale_factor`、`ground_plane_offset`,地面对齐平台地面,正前方朝向书桌),淡入;同一时间只有一个世界,新世界替换旧世界
+- [x] 配置:`worldLabs.draft`(开发用 `marble-1.0-draft`,演示切 `marble-1.1`)、`worldLabs.splat` 档位
+- [x] 「境」作品库:层 + world.spz + 精修图 + 对齐参数;右抽屉第 1~5 格放最新作品(青丝带),回放烧 10 秒后换上该世界
+- [x] 右抽屉第 0 格(最左)固定放「天」卷轴:展开是天空盒画面,不能画不能盖印;烧尽后淡出并卸载 splat,恢复天空;用后放回原位
+- [x] 实测 splat 体积、帧率:一个世界约 25 MB;编辑器平面视图有世界 201 fps / 无世界 213 fps(RTX 5070 Ti Laptop);`library.maxDiskMB` 保持 4096(约 150 个世界)
+- [x] 端到端实测(草稿):小船画 → 识别为「a quiet lake with a traditional fishing boat」(0.98)→ 共 78 秒 → 湖景在莲花台四周升起,书桌不受影响 → 存入右抽屉第 1 格;抽屉回放与烧「天」卷轴清场均正常
+- [ ] 演示前切 `marble-1.1` 实测一次(带 semantics 的缩放与地面对齐、耗时约 5 分钟时的燃烧节奏)
+- [x] 「境」的环境音：GPT 写环境声描述 → ElevenLabs 生成 22 秒循环（与生成世界并行，约 4 秒）→ 存为 ambience.mp3；世界升起时淡入、清场时淡出；先按响度统一电平再乘 0.28（比书桌环境音常态低约 8 dB），书桌环境音同时压到 35%
+
+**验收:** 盖「境」印烧尽后,世界在莲花台四周出现,书桌和特效都在、层级正确;烧「天」卷轴恢复天空;重启后右抽屉的世界可以回放。
 
 ---
 

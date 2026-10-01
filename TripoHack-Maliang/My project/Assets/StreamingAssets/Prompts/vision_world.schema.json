@@ -1,0 +1,66 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "reason",
+    "seen",
+    "confidence",
+    "subject",
+    "refine_prompt",
+    "world_prompt",
+    "ambience_prompt"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "fail"
+      ]
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "enum": [
+        "unrecognizable",
+        "too_abstract",
+        "nearly_blank",
+        "crowded",
+        null
+      ]
+    },
+    "seen": {
+      "type": "string"
+    },
+    "confidence": {
+      "type": "number"
+    },
+    "subject": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "refine_prompt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "world_prompt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "ambience_prompt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  }
+}

@@ -22,14 +22,15 @@ namespace Maliang.Api
 
         public bool Enabled => _config.imageGen.enabled;
 
-        public async Task<byte[]> RefineAsync(byte[] inkPng, string prompt, CancellationToken cancel = default)
+        /// <param name="size">1024x1024 for an object; 1536x1024 (landscape) for a world.</param>
+        public async Task<byte[]> RefineAsync(byte[] inkPng, string prompt, CancellationToken cancel = default, string size = "1024x1024")
         {
             var form = new List<IMultipartFormSection>
             {
                 new MultipartFormFileSection("image", inkPng, "ink.png", "image/png"),
                 new MultipartFormDataSection("model", _config.imageGen.model),
                 new MultipartFormDataSection("prompt", prompt),
-                new MultipartFormDataSection("size", "1024x1024"),
+                new MultipartFormDataSection("size", size),
                 new MultipartFormDataSection("quality", "high"),
             };
             var headers = new Dictionary<string, string> { ["Authorization"] = "Bearer " + _config.vision.apiKey };

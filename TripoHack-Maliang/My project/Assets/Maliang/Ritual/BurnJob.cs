@@ -97,7 +97,7 @@ namespace Maliang.Ritual
     /// waits in its embers if loading takes longer. A load that fails (files missing or broken) fails as
     /// <see cref="FailReason.Faded"/>.
     /// </summary>
-    public class ReplayJob : IBurnJob, IPreparedSummon
+    public class ReplayJob : IBurnJob, IPreparedSummon, IBurnOutcome
     {
         readonly Func<CancellationToken, Task<bool>> _load;
         readonly CancellationTokenSource _cancel = new CancellationTokenSource();
@@ -127,6 +127,11 @@ namespace Maliang.Ritual
 
         /// <summary>The object built by the load, revealed when the scroll has burned away (set by the loader).</summary>
         public Maliang.Loading.SummonedObject Prepared { get; set; }
+
+        /// <summary>Anything else that happens once the scroll has burned away (a world rising, the sky returning).</summary>
+        public Action<ScrollRitual> OnBurnedAway { get; set; }
+
+        public void Apply(ScrollRitual ritual) => OnBurnedAway?.Invoke(ritual);
 
         public bool Loading => _task != null && !_task.IsCompleted;
         public JobVerdict Verdict => JobVerdict.Ok;

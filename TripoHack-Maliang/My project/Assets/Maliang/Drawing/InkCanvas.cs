@@ -303,6 +303,15 @@ namespace Maliang.Drawing
             return ok;
         }
 
+        /// <summary>Puts pictures on the scroll's layers directly (the sky scroll); null leaves a layer empty.</summary>
+        public void LoadLayers(Texture ink, Texture seal)
+        {
+            if (ink != null) Graphics.Blit(ink, _ink);
+            if (seal != null) Graphics.Blit(seal, _seal);
+            HasSeal = seal != null;
+            InputLocked = true;
+        }
+
         static bool BlitPng(byte[] png, RenderTexture rt)
         {
             if (png == null) return false;

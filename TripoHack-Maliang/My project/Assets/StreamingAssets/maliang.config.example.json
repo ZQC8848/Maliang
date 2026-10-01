@@ -3,7 +3,8 @@
   "worldLabs": {
     "apiKey": "",
     "model": "marble-1.1",
-    "splat": "full_res"
+    "splat": "full_res",
+    "draft": true
   },
   "tripo": {
     "apiKey": "",
