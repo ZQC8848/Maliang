@@ -1,7 +1,9 @@
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Maliang.Api;
 using Maliang.Core;
+using Maliang.Library;
 using UnityEngine;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
 
@@ -39,10 +41,28 @@ namespace Maliang.Loading
                 SizeM = job.Plan?.SizeM ?? 0.4f,
                 Name = job.Plan?.Subject ?? "Summoned",
             };
+
+            /// <summary>A work from the library, exactly as it was first summoned.</summary>
+            public static Request From(LibraryEntry e) => new Request
+            {
+                ModelPath = e.PathOf(e.files.model),
+                ExtraClipPaths = (e.files.clips ?? new string[0]).Select(e.PathOf).ToArray(),
+                Animated = e.@object?.animated ?? false,
+                SoundPath = e.PathOf(e.files.sound),
+                SoundTrigger = e.@object?.sound?.trigger,
+                Category = e.category,
+                SizeM = e.@object?.sizeM ?? 0.4f,
+                Name = e.subject ?? "Summoned",
+            };
         }
 
-        public static async Task<SummonedObject> SpawnAsync(Request req, Vector3 centre, Quaternion facing, CancellationToken cancel = default)
+        /// <param name="hidden">Build it out of sight and inactive (nothing starts, nothing sounds) until
+        /// <see cref="Summoning.Reveal"/> places and wakes it.</param>
+        public static async Task<SummonedObject> SpawnAsync(Request req, Vector3 centre, Quaternion facing, CancellationToken cancel = default,
+            bool hidden = false)
         {
+            // Everything that waits comes first; the object is then put together in one frame.
+            AudioClip clip = !string.IsNullOrEmpty(req.SoundPath) ? await SoundClient.LoadClipAsync(req.SoundPath, cancel) : null;
             var loaded = await GlbObjectLoader.LoadAsync(req.ModelPath, null, cancel, req.ExtraClipPaths);
             if (loaded == null) return null;
 
@@ -86,17 +106,14 @@ namespace Maliang.Loading
             }
 
             summoned.soundTrigger = req.SoundTrigger;
-            if (!string.IsNullOrEmpty(req.SoundPath))
+            if (clip != null)
             {
-                var clip = await SoundClient.LoadClipAsync(req.SoundPath, cancel);
-                if (clip != null)
-                {
-                    summoned.audioSource = SummonAudio.Create(holder);
-                    summoned.audioSource.clip = clip;
-                }
+                summoned.audioSource = SummonAudio.Create(holder);
+                summoned.audioSource.clip = clip;
             }
+            if (hidden) holder.SetActive(false); // same frame: Start (motion, sound) waits for the reveal
             MaliangLog.Info("Spawn", $"{req.Name}: size {size:F2} m, {(summoned.anim != null ? $"{summoned.clips.Length} clip(s)" : "procedural motion")}, " +
-                                     $"sound {(summoned.audioSource != null ? req.SoundTrigger : "none")}");
+                                     $"sound {(summoned.audioSource != null ? req.SoundTrigger : "none")}{(hidden ? " (ready, hidden)" : "")}");
             return summoned;
         }
     }

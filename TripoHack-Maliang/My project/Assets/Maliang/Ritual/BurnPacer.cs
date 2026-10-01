@@ -30,8 +30,10 @@ namespace Maliang.Ritual
         [Range(0f, 1f)] public float holdPoint = 0.4f;
         [Tooltip("The fire slows down over this much burned share before a limit (the hold point, the job's progress).")]
         public float slowBand = 0.1f;
-        [Tooltip("While the job runs, the fire may creep this much burned share per second beyond the job's progress.")]
-        public float creepRate = 0.003f;
+        [Tooltip("While the job runs, the fire may creep up to this much burned share beyond the job's progress...")]
+        public float creepMax = 0.12f;
+        [Tooltip("...approaching it over about this many seconds (a real generation takes one to three minutes).")]
+        public float creepTime = 60f;
         [Tooltip("Furthest the fire burns before the job is done.")]
         [Range(0f, 1f)] public float maxBeforeDone = 0.95f;
         [Tooltip("A failure shows only after this much has burned, so the fire is seen to catch first.")]
@@ -46,7 +48,7 @@ namespace Maliang.Ritual
         public enum Phase { Idle, Burning, Holding, Loading, Embers, Finishing, Failed }
         public Phase Current { get; private set; } = Phase.Idle;
 
-        float _target, _creep;
+        float _target, _creepTime;
 
         void Awake()
         {
@@ -63,7 +65,7 @@ namespace Maliang.Ritual
         void OnIgnited(ScrollBurn b)
         {
             _target = 0f;
-            _creep = 0f;
+            _creepTime = 0f;
             if (ritual.Job is ReplayJob replay) replay.BeginLoading(); // the files load while it burns
             Set(Phase.Burning);
         }
@@ -72,7 +74,7 @@ namespace Maliang.Ritual
         public void ResetPacing()
         {
             _target = 0f;
-            _creep = 0f;
+            _creepTime = 0f;
             Current = Phase.Idle;
             burn.Holding = false;
         }
@@ -141,9 +143,10 @@ namespace Maliang.Ritual
             else
             {
                 // Generation running: the fire follows the job (its progress after the verdict maps onto the rest).
-                _creep += creepRate * Time.deltaTime;
+                _creepTime += Time.deltaTime;
+                float creep = creepMax * (1f - Mathf.Exp(-_creepTime / Mathf.Max(1f, creepTime)));
                 float jobShare = Mathf.InverseLerp(0.1f, 1f, job.Progress);
-                cap = Mathf.Min(maxBeforeDone, holdPoint + (maxBeforeDone - holdPoint) * jobShare + _creep);
+                cap = Mathf.Min(maxBeforeDone, holdPoint + (maxBeforeDone - holdPoint - creepMax) * jobShare + creep);
                 cap = Mathf.Max(cap, holdPoint);
                 Set(Phase.Loading);
             }

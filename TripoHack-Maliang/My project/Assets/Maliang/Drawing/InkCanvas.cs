@@ -1,6 +1,7 @@
 using System;
 using Maliang.Core;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace Maliang.Drawing
 {
@@ -258,6 +259,58 @@ namespace Maliang.Drawing
                 _cells[i] = true;
                 _inkedCells++;
             }
+        }
+
+        // ------------------------------------------------------------------ layers (library)
+
+        /// <summary>
+        /// Reads the ink and seal layers at full resolution as PNGs (the seal keeps its alpha), for the library
+        /// (Phase3Design 8.1). Calls back on the main thread a frame or two later.
+        /// </summary>
+        public void ReadLayers(Action<byte[], byte[]> done)
+        {
+            ReadPng(_ink, ink => ReadPng(_seal, seal => done?.Invoke(ink, seal)));
+        }
+
+        static void ReadPng(RenderTexture rt, Action<byte[]> done)
+        {
+            AsyncGPUReadback.Request(rt, 0, TextureFormat.RGBA32, req =>
+            {
+                if (req.hasError)
+                {
+                    Debug.LogError("[InkCanvas] layer readback failed");
+                    done?.Invoke(null);
+                    return;
+                }
+                var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGBA32, false);
+                tex.SetPixelData(req.GetData<Color32>(), 0);
+                tex.Apply(false);
+                byte[] png = tex.EncodeToPNG();
+                Destroy(tex);
+                done?.Invoke(png);
+            });
+        }
+
+        /// <summary>
+        /// Puts saved layers back on the scroll (a replay from the library): the drawing and the seal exactly as they
+        /// were. The canvas stays locked; the ink coverage is not tracked for a replay.
+        /// </summary>
+        public bool LoadLayers(byte[] inkPng, byte[] sealPng)
+        {
+            bool ok = BlitPng(inkPng, _ink) & BlitPng(sealPng, _seal);
+            HasSeal = sealPng != null;
+            InputLocked = true;
+            return ok;
+        }
+
+        static bool BlitPng(byte[] png, RenderTexture rt)
+        {
+            if (png == null) return false;
+            var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false);
+            if (!tex.LoadImage(png)) { Destroy(tex); return false; }
+            Graphics.Blit(tex, rt);
+            Destroy(tex);
+            return true;
         }
 
         // ------------------------------------------------------------------ export

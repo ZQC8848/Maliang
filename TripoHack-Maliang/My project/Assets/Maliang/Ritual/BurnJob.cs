@@ -51,6 +51,8 @@ namespace Maliang.Ritual
     {
         /// <summary>Settings for new fake jobs (set by <see cref="DeskDebugKeys"/>).</summary>
         public static FakeJobSettings Settings = new FakeJobSettings();
+        /// <summary>Use fake jobs even when the real agent is available (testing without spending credits).</summary>
+        public static bool Forced;
 
         readonly FakeJobSettings _s;
         readonly float _start;
@@ -95,7 +97,7 @@ namespace Maliang.Ritual
     /// waits in its embers if loading takes longer. A load that fails (files missing or broken) fails as
     /// <see cref="FailReason.Faded"/>.
     /// </summary>
-    public class ReplayJob : IBurnJob
+    public class ReplayJob : IBurnJob, IPreparedSummon
     {
         readonly Func<CancellationToken, Task<bool>> _load;
         readonly CancellationTokenSource _cancel = new CancellationTokenSource();
@@ -122,6 +124,9 @@ namespace Maliang.Ritual
         }
 
         public void Cancel() => _cancel.Cancel();
+
+        /// <summary>The object built by the load, revealed when the scroll has burned away (set by the loader).</summary>
+        public Maliang.Loading.SummonedObject Prepared { get; set; }
 
         public bool Loading => _task != null && !_task.IsCompleted;
         public JobVerdict Verdict => JobVerdict.Ok;

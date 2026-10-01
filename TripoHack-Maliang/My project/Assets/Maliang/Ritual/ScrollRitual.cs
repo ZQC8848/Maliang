@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using Maliang.Api;
 using Maliang.Core;
 using Maliang.Drawing;
+using Maliang.Loading;
 using Maliang.VR;
 using UnityEngine;
 
@@ -119,10 +120,12 @@ namespace Maliang.Ritual
         Coroutine _unrolling;
         Coroutine _failing;
         FailMessage _message;
+        bool _started;
 
         /// <summary>
-        /// Starts the summoning job when a scroll is sealed. Phase 5 sets this to the real <see cref="ObjectAgent"/>;
-        /// left null, a <see cref="FakeJob"/> from <see cref="FakeJob.Settings"/> stands in (no network).
+        /// Starts the summoning job when a scroll is sealed (set by <see cref="SummoningSetup"/> to the real agent when
+        /// the config allows it). Left null, returning null, or with <see cref="FakeJob.Forced"/>, a
+        /// <see cref="FakeJob"/> from <see cref="FakeJob.Settings"/> stands in (no network).
         /// </summary>
         public static Func<ScrollRitual, IBurnJob> StartJob;
 
@@ -155,6 +158,7 @@ namespace Maliang.Ritual
 
         void Start()
         {
+            _started = true;
             if (unroll == null) return;
             if (startMode == ScrollStartMode.UnrollOnStart) RollUpAndUnroll(unrollDelay);
             else if (startMode == ScrollStartMode.Rolled)
@@ -210,7 +214,7 @@ namespace Maliang.Ritual
             Job = job;
             Seal = seal;
             canvas.InputLocked = true;
-            if (State == ScrollState.Unrolled) Levitate();
+            if (_started && State == ScrollState.Unrolled) Levitate(); // a new scroll rises only after it has unrolled
         }
 
         void Levitate()
@@ -227,7 +231,7 @@ namespace Maliang.Ritual
             canvas.InputLocked = true;
             State = ScrollState.Levitating;
             MaliangLog.Info("Ritual", $"Sealed as {type} (ink coverage {canvas.InkCoverage:P1}); scroll rising.");
-            Job = StartJob != null ? StartJob(this) : new FakeJob(FakeJob.Settings, Time.time);
+            Job = (StartJob != null && !FakeJob.Forced ? StartJob(this) : null) ?? new FakeJob(FakeJob.Settings, Time.time);
             MaliangLog.Info("Ritual", $"Job started: {Job}");
             Sealed?.Invoke(type);
             _rise = StartCoroutine(Rise());
@@ -369,9 +373,13 @@ namespace Maliang.Ritual
             BurnStarted?.Invoke();
         }
 
-        /// <summary>Called by <see cref="ScrollBurn"/> once the paper is gone: frees the hover spot and hides the scroll.</summary>
+        /// <summary>
+        /// Called by <see cref="ScrollBurn"/> once the paper is gone: the summoned object appears where the scroll was,
+        /// the hover spot is freed and the scroll is hidden.
+        /// </summary>
         public void OnBurnedAway()
         {
+            if (Job is IPreparedSummon summon && summon.Prepared != null) Summoning.Reveal(summon.Prepared, Root.position, Head);
             State = ScrollState.Done;
             IsHovering = false;
             IsHeld = false;
@@ -473,6 +481,7 @@ namespace Maliang.Ritual
             if (_failing != null) { StopCoroutine(_failing); _failing = null; }
             if (_message != null) { _message.Hide(); _message = null; }
             if (Job is ReplayJob replay) replay.Cancel();
+            if (Job is SummonJob summoning) summoning.Cancel();
             Job = null;
             IsReplay = false;
             var burn = GetComponent<ScrollBurn>();

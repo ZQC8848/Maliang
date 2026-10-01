@@ -63,8 +63,9 @@ namespace Maliang.Ritual
             pickup.SetPickable(false);
             if (pickup == spare) spare = null;
 
-            // Slide (and turn) into the drawing spot, still rolled up.
+            // Slide (and turn) into the drawing spot, still rolled up. (A scroll from a drawer stops riding with it.)
             var t = pickup.transform;
+            t.SetParent(null, true);
             Vector3 p0 = t.position;
             Quaternion r0 = t.rotation;
             for (float k = 0f; k < 1f; k += Time.deltaTime / Mathf.Max(0.01f, placeDuration))

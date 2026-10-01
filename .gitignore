@@ -1,6 +1,8 @@
 # Unity generated (patterns without a leading slash match in every Unity
 # project under this repo: ReferenceProject/, TripoHack-Maliang/My project/, ...)
 [Ll]ibrary/
+# ...but not the game's own code folder that happens to be called Library (the artwork library)
+!TripoHack-Maliang/My project/Assets/Maliang/Library/
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/

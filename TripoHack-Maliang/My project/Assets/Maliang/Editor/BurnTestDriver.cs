@@ -22,7 +22,7 @@ namespace Maliang.EditorTools
         static readonly float[] FailShots = { 0.4f, 1.0f, 1.7f, 2.6f, 5f, 14.4f };
         static readonly Vector2 TouchUv = new Vector2(0.62f, 0.3f);
 
-        enum Step { LayDown, WaitUnrolled, WaitHover, Touch, Burning, Done }
+        enum Step { LayDown, WaitUnrolled, WaitHover, Touch, Burning, Reveal, Done }
 
         static Step _step;
         static ScrollRitual _scroll;
@@ -37,6 +37,9 @@ namespace Maliang.EditorTools
         static FakeJobSettings _settings;
         static float _replayLoad = -1f; // >= 0: replay with a stand-in load of this many seconds
         static bool _replayFaded;
+        static bool _real;              // the real agent (spends credits) instead of a fake job
+        static bool _forcedBefore;
+        static string _image;           // a picture to put on the scroll instead of the painted test drawing
         static Camera _capture;
 
         [MenuItem("Maliang/Debug/Burn Test/Success (Play Mode)")]
@@ -53,6 +56,21 @@ namespace Maliang.EditorTools
         static void RunReplaySlow() => RunReplay(16f, false);
         [MenuItem("Maliang/Debug/Burn Test/Replay - Faded (Play Mode)")]
         static void RunReplayFaded() => RunReplay(2f, true);
+
+        /// <summary>
+        /// The real summoning (GPT, Tripo, sound; spends credits): the test drawing is sealed for real, the work is saved
+        /// to the library and the object appears when the scroll has burned away.
+        /// </summary>
+        [MenuItem("Maliang/Debug/Burn Test/Real Summoning - Uses API Credits (Play Mode)")]
+        static void RunRealMenu() => RunReal();
+
+        /// <param name="imagePath">A drawing (PNG) to put on the scroll; null paints the test landscape.</param>
+        public static void RunReal(string imagePath = null)
+        {
+            Start(new FakeJobSettings(), "Real" + (imagePath != null ? "_" + Path.GetFileNameWithoutExtension(imagePath) : ""));
+            _real = true;
+            _image = imagePath;
+        }
 
         /// <summary>A replayed scroll (fixed 10 s burn) with a stand-in load of <paramref name="loadSeconds"/>.</summary>
         public static void RunReplay(float loadSeconds, bool faded)
@@ -73,6 +91,9 @@ namespace Maliang.EditorTools
             if (!Application.isPlaying) { Debug.LogWarning("[BurnTest] enter play mode first"); return; }
             _settings = settings;
             _replayLoad = -1f;
+            _real = false;
+            _image = null;
+            _forcedBefore = FakeJob.Forced;
             _step = Step.LayDown;
             _shot = _failShot = 0;
             _holdShot = false;
@@ -105,12 +126,16 @@ namespace Maliang.EditorTools
 
                 case Step.WaitUnrolled:
                     if (_scroll.State != ScrollState.Unrolled) return;
-                    CanvasTestPainter.PaintMountainScene(_scroll.canvas, Object.FindAnyObjectByType<BrushPen>().CurrentStyle);
+                    if (_image != null) PaintImage(_scroll.canvas, _image);
+                    else CanvasTestPainter.PaintMountainScene(_scroll.canvas, Object.FindAnyObjectByType<BrushPen>().CurrentStyle);
                     if (_replayLoad >= 0f) _scroll.BeginReplay(ReplayJob.Fake(_replayLoad, _replayFaded)); // rises by itself
                     else
                     {
                         FakeJob.Settings = _settings;
+                        FakeJob.Forced = !_real; // fake tests never reach the API
                         _scroll.OnSealed(SealType.Object);
+                        FakeJob.Forced = _forcedBefore;
+                        Debug.Log($"[BurnTest] job: {_scroll.Job}");
                     }
                     _burn = _scroll.GetComponent<ScrollBurn>();
                     _pacer = _scroll.GetComponent<BurnPacer>();
@@ -171,8 +196,15 @@ namespace Maliang.EditorTools
                     if (_burn.IsBurnedAway)
                     {
                         Debug.Log($"[BurnTest] burned away {t:F1}s after catching; frames in {_dir}");
-                        Stop();
+                        Next(Step.Reveal);
                     }
+                    break;
+
+                case Step.Reveal:
+                    // The summoned object (if any) grows out of the embers where the scroll was.
+                    if (Time.time - _stepTime < 1.2f) return;
+                    Capture("summoned.png");
+                    Stop();
                     break;
             }
         }
@@ -183,6 +215,24 @@ namespace Maliang.EditorTools
             EditorApplication.update -= Tick;
             if (_capture != null) Object.Destroy(_capture.gameObject);
             _capture = null;
+        }
+
+        /// <summary>Draws a picture onto the scroll's ink layer, full height, centred, white either side.</summary>
+        static void PaintImage(InkCanvas canvas, string path)
+        {
+            var tex = new Texture2D(2, 2);
+            tex.LoadImage(File.ReadAllBytes(path));
+            var rt = canvas.Ink;
+            var prev = RenderTexture.active;
+            RenderTexture.active = rt;
+            GL.Clear(false, true, Color.white);
+            GL.PushMatrix();
+            GL.LoadPixelMatrix(0, rt.width, rt.height, 0);
+            float h = rt.height, w = h * tex.width / tex.height;
+            Graphics.DrawTexture(new Rect((rt.width - w) * 0.5f, 0f, w, h), tex);
+            GL.PopMatrix();
+            RenderTexture.active = prev;
+            Object.Destroy(tex);
         }
 
         /// <summary>A frame from the player's eye position, looking at the scroll (wherever it has fallen).</summary>

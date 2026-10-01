@@ -37,6 +37,8 @@ namespace Maliang.Api
         public string[] ExtraClipPaths { get; internal set; } = new string[0];  // further clips on the same rig
         public bool Animated { get; internal set; }
         public string SoundPath { get; internal set; }
+        /// <summary>The sound has arrived, failed, or was never wanted (it never blocks the object).</summary>
+        public bool SoundDone { get; internal set; }
 
         public event Action<ObjectJob> VerdictReady;
         public event Action<ObjectJob> Completed;
@@ -112,6 +114,7 @@ namespace Maliang.Api
 
                 // 5. Sound, in parallel; never blocks the object
                 if (plan.Sound.Wanted && _sound.Enabled) _ = SoundAsync(job, plan.Sound, cancel);
+                else job.SoundDone = true;
 
                 // 2. Image refine (skipped on error)
                 Set(job, "refine", 0.1f);
@@ -213,6 +216,7 @@ namespace Maliang.Api
                 job.RaiseSound();
             }
             catch (Exception e) { MaliangLog.Warn("Agent", $"Sound skipped: {e.Message}"); }
+            finally { job.SoundDone = true; }
         }
 
         static async Task FailLaterAsync(ObjectJob job, FailReason reason)
@@ -230,6 +234,7 @@ namespace Maliang.Api
         static void Fail(ObjectJob job, FailReason reason)
         {
             bool beforeVerdict = job.Verdict == JobVerdict.Pending;
+            if (beforeVerdict) job.SoundDone = true; // no sound was started
             job.Reason = reason;
             job.Verdict = JobVerdict.Fail;
             job.Done = true;

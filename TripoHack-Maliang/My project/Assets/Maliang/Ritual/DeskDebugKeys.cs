@@ -9,7 +9,8 @@ namespace Maliang.Ritual
     /// Development shortcuts for the desk: keyboard (editor / desktop) and the left controller's menu button.
     /// R or left menu: reset the scroll.   E: export the ink to TestData/Exports/ as PNG.
     /// B: set the hovering scroll alight without the candle.
-    /// Summoning without the API (the fake job a sealed scroll waits on; also applied to the scroll in progress):
+    /// 0: switch between the real agent and fake summoning (no API).
+    /// Fake summoning (the fake job a sealed scroll waits on; also applied to the scroll in progress):
     /// 1: succeeds   2: fails at the verdict (unrecognizable)   3: fails during generation (collapsed)
     /// 4: slow verdict (25 s), to see the fire wait at 40%.
     /// Replay (the 10 s library burn) of whatever lies drawn on the desk, with a stand-in load:
@@ -20,7 +21,9 @@ namespace Maliang.Ritual
         [Tooltip("Resets / exports the station's active scroll (and clears away earlier ones). Without it, the ritual below.")]
         public ScrollStation station;
         public ScrollRitual ritual;
-        [Tooltip("How a sealed scroll's summoning plays out while the real agent is not connected.")]
+        [Tooltip("Use the fake summoning below even when the real agent is available (no API calls, no credits). Key 0 toggles.")]
+        public bool fakeSummoning;
+        [Tooltip("How a sealed scroll's summoning plays out when it is fake (or the real agent is not available).")]
         public FakeJobSettings fakeJob = new FakeJobSettings();
 
         ScrollRitual Active => station != null && station.Active != null ? station.Active : ritual;
@@ -37,8 +40,14 @@ namespace Maliang.Ritual
 
         void OnDisable() => _reset?.Dispose();
 
-        void Awake() => FakeJob.Settings = fakeJob;
-        void OnValidate() => FakeJob.Settings = fakeJob;
+        void Awake() => Apply();
+        void OnValidate() => Apply();
+
+        void Apply()
+        {
+            FakeJob.Settings = fakeJob;
+            FakeJob.Forced = fakeSummoning;
+        }
 
         void Update()
         {
@@ -52,6 +61,12 @@ namespace Maliang.Ritual
             if (Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame) IgniteHovering();
             var kb = Keyboard.current;
             if (kb == null) return;
+            if (kb.digit0Key.wasPressedThisFrame)
+            {
+                fakeSummoning = !fakeSummoning;
+                Apply();
+                MaliangLog.Info("Debug", fakeSummoning ? "Summoning: FAKE (no API)" : "Summoning: real agent (if configured)");
+            }
             if (kb.digit1Key.wasPressedThisFrame) SetOutcome(FakeOutcome.Success, 6f);
             if (kb.digit2Key.wasPressedThisFrame) SetOutcome(FakeOutcome.FailAtVerdict, 6f);
             if (kb.digit3Key.wasPressedThisFrame) SetOutcome(FakeOutcome.FailAfterVerdict, 6f);
@@ -79,7 +94,8 @@ namespace Maliang.Ritual
         {
             fakeJob.outcome = outcome;
             fakeJob.verdictDelay = verdictDelay;
-            FakeJob.Settings = fakeJob;
+            fakeSummoning = true; // choosing a fake outcome means testing without the API
+            Apply();
             var active = Active;
             if (active != null && active.Job is FakeJob && !active.Job.Done &&
                 (active.State == ScrollState.Levitating || active.State == ScrollState.Burning))

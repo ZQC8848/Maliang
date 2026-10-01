@@ -82,8 +82,12 @@ namespace Maliang.VR
         public void SnapToRest()
         {
             if (_returning != null) { StopCoroutine(_returning); _returning = null; }
-            transform.SetPositionAndRotation(_restPos, _restRot);
+            transform.SetPositionAndRotation(RestPosition, RestRotation);
         }
+
+        // A rest pose transform is followed live (it may move, like a slot in a drawer); otherwise the pose at start.
+        Vector3 RestPosition => restPose != null ? restPose.position : _restPos;
+        Quaternion RestRotation => restPose != null ? restPose.rotation : _restRot;
 
         IEnumerator ReturnToRest()
         {
@@ -94,10 +98,10 @@ namespace Maliang.VR
             for (float t = 0f; t < 1f; t += Time.deltaTime / Mathf.Max(0.01f, returnDuration))
             {
                 float k = Mathf.SmoothStep(0f, 1f, t);
-                transform.SetPositionAndRotation(Vector3.Lerp(p0, _restPos, k), Quaternion.Slerp(r0, _restRot, k));
+                transform.SetPositionAndRotation(Vector3.Lerp(p0, RestPosition, k), Quaternion.Slerp(r0, RestRotation, k));
                 yield return null;
             }
-            transform.SetPositionAndRotation(_restPos, _restRot);
+            transform.SetPositionAndRotation(RestPosition, RestRotation);
             _returning = null;
         }
     }
