@@ -49,6 +49,8 @@ namespace Maliang.EditorTools
         static readonly Vector3 LotusCenter = new Vector3(0f, 0f, 0.45f); // between the player and the desk
         const string StoneAlbedo = "Assets/Maliang/Art/Textures/stone_albedo.png";
         const string StoneNormal = "Assets/Maliang/Art/Textures/stone_normal.png";
+        const string SkyTexture = "Assets/Maliang/Art/Sky/ShanshuiSky.png";   // 2:1 lat-long panorama (Tools/environment/refs)
+        const float SkyFrontU = 0.58f;  // panorama column (0..1) to put straight ahead of the player: the central peaks
         const string ScrollPrefabPath = "Assets/Maliang/Prefabs/Scroll.prefab";
         const string ScrollQuadPath = "Assets/Maliang/Art/Desk/ScrollQuad.asset";
         static readonly Vector2 SpareScrollXZ = new Vector2(0f, 0.97f); // rolled spare, lying across the back of the desk
@@ -181,6 +183,8 @@ namespace Maliang.EditorTools
             BuildSeal("Seal 境 (World)", SealType.World, SealJing, SealWorldModel, null, null, new Vector3(SealWorldXZ.x, surfaceY, SealWorldXZ.y));
             foreach (var seal in Object.FindObjectsByType<SealStamp>(FindObjectsInactive.Include)) seal.station = station;
 
+            report.Add(SetupSky());
+
             RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Trilight;
             RenderSettings.ambientSkyColor = new Color(0.55f, 0.55f, 0.6f);
             RenderSettings.ambientEquatorColor = new Color(0.4f, 0.37f, 0.33f);
@@ -190,6 +194,53 @@ namespace Maliang.EditorTools
             AddToBuildSettings(ScenePath);
             report.Add($"Saved {ScenePath}; tabletop {deskTop.min}..{deskTop.max}, drawing spot at {stationGo.transform.position}, rolled scroll at {spare.transform.position}, pen at {pen.transform.position}");
             return string.Join("\n", report);
+        }
+
+        // ------------------------------------------------------------------ sky
+
+        /// <summary>
+        /// The shanshui panorama as a 360° lat-long skybox, turned so <see cref="SkyFrontU"/> is straight ahead (+Z).
+        /// No mipmaps: a panoramic skybox samples across the wrap seam, where mips would draw a thin line.
+        /// </summary>
+        static string SetupSky()
+        {
+            if (AssetImporter.GetAtPath(SkyTexture) is TextureImporter ti)
+            {
+                bool dirty = ti.mipmapEnabled || ti.wrapModeU != TextureWrapMode.Repeat || ti.wrapModeV != TextureWrapMode.Clamp ||
+                             ti.maxTextureSize < 2048 || ti.textureCompression != TextureImporterCompression.CompressedHQ;
+                if (dirty)
+                {
+                    ti.textureType = TextureImporterType.Default;
+                    ti.sRGBTexture = true;
+                    ti.mipmapEnabled = false;
+                    ti.wrapModeU = TextureWrapMode.Repeat;
+                    ti.wrapModeV = TextureWrapMode.Clamp;
+                    ti.filterMode = FilterMode.Bilinear;
+                    ti.maxTextureSize = 2048;
+                    ti.textureCompression = TextureImporterCompression.CompressedHQ;
+                    ti.SaveAndReimport();
+                }
+            }
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(SkyTexture);
+            if (tex == null) return "Sky texture missing; kept the default skybox";
+
+            string path = MatDir + "/Sky Shanshui.mat";
+            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
+            if (mat == null)
+            {
+                mat = new Material(Shader.Find("Skybox/Panoramic"));
+                AssetDatabase.CreateAsset(mat, path);
+            }
+            mat.SetTexture("_MainTex", tex);
+            mat.SetFloat("_Mapping", 1f);   // latitude-longitude layout
+            mat.SetFloat("_ImageType", 0f); // 360°
+            mat.SetFloat("_Exposure", 1f);
+            mat.SetColor("_Tint", new Color(0.5f, 0.5f, 0.5f, 0.5f)); // neutral
+            // Unity's panorama puts u = 0.25 at +Z; turning the sky by +θ° moves the view θ/360 further along u.
+            mat.SetFloat("_Rotation", Mathf.Repeat((0.25f - SkyFrontU) * 360f, 360f));
+            EditorUtility.SetDirty(mat);
+            RenderSettings.skybox = mat;
+            return $"Sky: {tex.width}x{tex.height} panorama, rotation {mat.GetFloat("_Rotation"):F0}°";
         }
 
         // ------------------------------------------------------------------ player
