@@ -234,7 +234,7 @@ namespace Maliang.Library
                 stamp.transform.localScale = new Vector3(0.02f, 0.016f, 1f);
                 stamp.GetComponent<Renderer>().sharedMaterial = _tagSeal;
             }
-            ritual.Unrolled += () => { if (deco != null) deco.gameObject.SetActive(false); };
+            ritual.Unrolling += () => { if (deco != null) deco.gameObject.SetActive(false); }; // the seal breaks as it opens
         }
 
         Texture SealTexture()

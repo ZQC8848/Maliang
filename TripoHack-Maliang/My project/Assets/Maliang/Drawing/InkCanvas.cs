@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using Maliang.Core;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -11,6 +12,10 @@ namespace Maliang.Drawing
     ///
     /// Layers: Ink RT (opaque white, brush strokes) and Seal RT (transparent, one stamp). Paper is a material tint/texture.
     /// UV (0,0) is the local (-x, -z) corner, UV (1,1) the (+x, +z) corner; the top of the drawing is the far (+z) edge.
+    ///
+    /// Undo: the brush marks of the last <see cref="UndoLimit"/> strokes are recorded; <see cref="Undo"/> puts the
+    /// picture from before them back and redraws all but the last (same marks, same pixels). Older strokes are merged
+    /// into that base picture.
     /// </summary>
     [RequireComponent(typeof(MeshFilter), typeof(MeshRenderer))]
     public class InkCanvas : MonoBehaviour
@@ -48,6 +53,9 @@ namespace Maliang.Drawing
 
         public event Action Cleared;
 
+        /// <summary>How many strokes can be taken back.</summary>
+        public const int UndoLimit = 20;
+
         void Awake()
         {
             BuildMesh();
@@ -59,6 +67,7 @@ namespace Maliang.Drawing
         {
             if (_ink != null) _ink.Release();
             if (_seal != null) _seal.Release();
+            if (_base != null) _base.Release();
             if (_stampMat != null) Destroy(_stampMat);
             if (_display != null) Destroy(_display);
         }
@@ -142,19 +151,31 @@ namespace Maliang.Drawing
             Bind(_ink, brush, color, false);
             GL.Begin(GL.QUADS);
             _batching = true;
+            _segment = null;
+            if (_recording != null)
+            {
+                _segment = new Segment { brush = brush, color = color };
+                _recording.Add(_segment);
+            }
         }
 
         /// <summary>Adds one brush stamp centred at pixel <paramref name="px"/> to the open batch.</summary>
         public void AddBrushStamp(Vector2 px, Vector2 pixelSize)
         {
             if (!_batching) return;
+            EmitQuad(px, pixelSize);
+            MarkCoverage(_cells, ref _inkedCells, px, pixelSize);
+            _segment?.stamps.Add(new Vector4(px.x, px.y, pixelSize.x, pixelSize.y));
+        }
+
+        void EmitQuad(Vector2 px, Vector2 pixelSize)
+        {
             float l = (px.x - pixelSize.x * 0.5f) / WidthPx, r = (px.x + pixelSize.x * 0.5f) / WidthPx;
             float b = (px.y - pixelSize.y * 0.5f) / HeightPx, t = (px.y + pixelSize.y * 0.5f) / HeightPx;
             GL.TexCoord2(0, 0); GL.Vertex3(l, b, 0);
             GL.TexCoord2(1, 0); GL.Vertex3(r, b, 0);
             GL.TexCoord2(1, 1); GL.Vertex3(r, t, 0);
             GL.TexCoord2(0, 1); GL.Vertex3(l, t, 0);
-            MarkCoverage(px, Mathf.Max(pixelSize.x, pixelSize.y) * 0.25f);
         }
 
         public void EndBrushBatch()
@@ -164,6 +185,7 @@ namespace Maliang.Drawing
             GL.PopMatrix();
             RenderTexture.active = _batchPrevRT;
             _batching = false;
+            if (_recording == null) Rebase(); // ink put down outside a stroke cannot be taken back
         }
 
         /// <summary>Draws a single brush stamp (convenience; strokes use the batch API).</summary>
@@ -184,6 +206,7 @@ namespace Maliang.Drawing
             DrawQuad(_seal, sealTex, Color.white, true, c00, c10, c11, c01,
                 new Vector2(0, 0), new Vector2(1, 0), new Vector2(1, 1), new Vector2(0, 1));
             HasSeal = true;
+            ForgetStrokes(); // sealed: the drawing is final, nothing can be taken back
         }
 
         void DrawQuad(RenderTexture target, Texture tex, Color color, bool useTexColor,
@@ -229,6 +252,10 @@ namespace Maliang.Drawing
             ClearTarget(_ink, Color.white);
             Array.Clear(_cells, 0, _cells.Length);
             _inkedCells = 0;
+            _history.Clear();
+            _recording = null;
+            _segment = null;
+            _baseBlank = true;
         }
 
         public void ClearSeal()
@@ -245,8 +272,9 @@ namespace Maliang.Drawing
             Cleared?.Invoke();
         }
 
-        void MarkCoverage(Vector2 px, float radiusPx)
+        void MarkCoverage(bool[] cells, ref int inked, Vector2 px, Vector2 pixelSize)
         {
+            float radiusPx = Mathf.Max(pixelSize.x, pixelSize.y) * 0.25f;
             float cx = px.x / WidthPx * _gridW, cy = px.y / HeightPx * _gridH;
             float r = radiusPx / WidthPx * _gridW;
             int x0 = Mathf.Max(0, Mathf.FloorToInt(cx - r)), x1 = Mathf.Min(_gridW - 1, Mathf.FloorToInt(cx + r));
@@ -255,10 +283,133 @@ namespace Maliang.Drawing
             for (int x = x0; x <= x1; x++)
             {
                 int i = y * _gridW + x;
-                if (_cells[i]) continue;
-                _cells[i] = true;
-                _inkedCells++;
+                if (cells[i]) continue;
+                cells[i] = true;
+                inked++;
             }
+        }
+
+        // ------------------------------------------------------------------ undo
+
+        class Segment
+        {
+            public Texture brush;
+            public Color color;
+            public readonly List<Vector4> stamps = new List<Vector4>(); // centre px (x, y), size px (z, w)
+        }
+
+        readonly List<List<Segment>> _history = new List<List<Segment>>(); // oldest first
+        List<Segment> _recording;
+        Segment _segment;
+        RenderTexture _base;                 // the picture before the recorded strokes (allocated when first needed)
+        bool _baseBlank = true;              // ... or a clean sheet
+        bool[] _baseCells;
+        int _baseInked;
+
+        /// <summary>Strokes that can be taken back now.</summary>
+        public int UndoCount => _history.Count;
+        /// <summary>Only while drawing: never once the seal is on (or the canvas is locked).</summary>
+        public bool CanUndo => !InputLocked && !HasSeal && _history.Count > 0;
+
+        /// <summary>Starts recording a stroke (pen down). Ends any stroke still open.</summary>
+        public void BeginStroke()
+        {
+            EndStroke();
+            _recording = new List<Segment>();
+        }
+
+        /// <summary>Ends the stroke being recorded (pen up); safe to call when none is.</summary>
+        public void EndStroke()
+        {
+            if (_recording == null) return;
+            var stroke = _recording;
+            _recording = null;
+            _segment = null;
+            if (!stroke.Exists(s => s.stamps.Count > 0)) return;
+            _history.Add(stroke);
+            if (_history.Count > UndoLimit)
+            {
+                // The oldest stroke can no longer be taken back: merge it into the base picture.
+                EnsureBase();
+                Draw(_history[0], _base, _baseCells, ref _baseInked);
+                _history.RemoveAt(0);
+            }
+        }
+
+        /// <summary>Takes back the last stroke. False when there is none (or the canvas is locked).</summary>
+        public bool Undo()
+        {
+            EndStroke();
+            if (!CanUndo) return false;
+            _history.RemoveAt(_history.Count - 1);
+
+            if (_baseBlank)
+            {
+                ClearTarget(_ink, Color.white);
+                Array.Clear(_cells, 0, _cells.Length);
+                _inkedCells = 0;
+            }
+            else
+            {
+                Graphics.CopyTexture(_base, _ink);
+                Array.Copy(_baseCells, _cells, _cells.Length);
+                _inkedCells = _baseInked;
+            }
+            foreach (var stroke in _history) Draw(stroke, _ink, _cells, ref _inkedCells);
+            MaliangLog.Info("Canvas", $"Undo: {_history.Count} stroke(s) left to take back, ink coverage {InkCoverage:P1}");
+            return true;
+        }
+
+        /// <summary>Drops the recorded strokes (the picture stays as it is).</summary>
+        void ForgetStrokes()
+        {
+            if (_batching) EndBrushBatch();
+            _history.Clear();
+            _recording = null;
+            _segment = null;
+        }
+
+        /// <summary>Makes the current picture the base: nothing before now can be taken back.</summary>
+        void Rebase()
+        {
+            _history.Clear();
+            EnsureBase();
+            Graphics.CopyTexture(_ink, _base);
+            Array.Copy(_cells, _baseCells, _cells.Length);
+            _baseInked = _inkedCells;
+        }
+
+        void EnsureBase()
+        {
+            if (_base == null) _base = NewTarget("InkUndoBaseRT");
+            if (_baseCells == null || _baseCells.Length != _cells.Length) _baseCells = new bool[_cells.Length];
+            if (!_baseBlank) return;
+            ClearTarget(_base, Color.white);
+            Array.Clear(_baseCells, 0, _baseCells.Length);
+            _baseInked = 0;
+            _baseBlank = false;
+        }
+
+        /// <summary>Redraws a recorded stroke onto <paramref name="target"/>, marking its coverage in <paramref name="cells"/>.</summary>
+        void Draw(List<Segment> stroke, RenderTexture target, bool[] cells, ref int inked)
+        {
+            var prev = RenderTexture.active;
+            foreach (var seg in stroke)
+            {
+                if (seg.stamps.Count == 0 || seg.brush == null) continue;
+                Bind(target, seg.brush, seg.color, false);
+                GL.Begin(GL.QUADS);
+                foreach (var s in seg.stamps)
+                {
+                    var px = new Vector2(s.x, s.y);
+                    var size = new Vector2(s.z, s.w);
+                    EmitQuad(px, size);
+                    MarkCoverage(cells, ref inked, px, size);
+                }
+                GL.End();
+                GL.PopMatrix();
+            }
+            RenderTexture.active = prev;
         }
 
         // ------------------------------------------------------------------ layers (library)
@@ -298,6 +449,7 @@ namespace Maliang.Drawing
         public bool LoadLayers(byte[] inkPng, byte[] sealPng)
         {
             bool ok = BlitPng(inkPng, _ink) & BlitPng(sealPng, _seal);
+            ForgetStrokes(); // locked from now on: nothing to take back
             HasSeal = sealPng != null;
             InputLocked = true;
             return ok;
@@ -308,6 +460,7 @@ namespace Maliang.Drawing
         {
             if (ink != null) Graphics.Blit(ink, _ink);
             if (seal != null) Graphics.Blit(seal, _seal);
+            ForgetStrokes(); // locked from now on: nothing to take back
             HasSeal = seal != null;
             InputLocked = true;
         }

@@ -36,14 +36,26 @@ namespace Maliang.Drawing
 
         public bool Active => _hasLast;
 
+        /// <summary>Pen down: a new stroke (one step of undo).</summary>
         public void Begin()
+        {
+            Reset();
+            _canvas.BeginStroke();
+        }
+
+        /// <summary>Pen up; safe to call when no stroke is going on.</summary>
+        public void End()
+        {
+            Reset();
+            _canvas.EndStroke();
+        }
+
+        void Reset()
         {
             _hasLast = false;
             _pointCount = 0;
             _speedCount = 0;
         }
-
-        public void End() => Begin();
 
         /// <param name="px">Brush position in Ink RT pixels.</param>
         /// <param name="pressure">0..1 size from pen height (reference "brushOutSize").</param>

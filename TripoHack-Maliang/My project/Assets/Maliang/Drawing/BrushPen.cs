@@ -2,13 +2,15 @@ using Maliang.Core;
 using Maliang.Ritual;
 using Maliang.VR;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Maliang.Drawing
 {
     /// <summary>
     /// The calligraphy brush (port of Node_Brush PenBase/BonePen). While held, the nib is projected onto the
     /// fixed horizontal canvas; within <see cref="contactHeight"/> above the paper it paints, lower = thicker.
-    /// Dip the nib into an <see cref="InkPot"/> to change colour.
+    /// Dip the nib into an <see cref="InkPot"/> to change colour. A / X on either controller (Z on the keyboard) takes
+    /// the last stroke back, up to <see cref="InkCanvas.UndoLimit"/> strokes.
     /// </summary>
     public class BrushPen : GrabbableTool
     {
@@ -84,6 +86,7 @@ namespace Maliang.Drawing
         float _grainTimer;
         bool _touching, _deepWarned;
         AudioSource _strokeLoop;
+        InputAction _undo;
         float _strokeLevel; // set in Update while the nib moves on the paper, applied in LateUpdate
 
         public bool IsDrawing => _stroke != null && _stroke.Active;
@@ -98,6 +101,23 @@ namespace Maliang.Drawing
             base.Awake();
             _mpb = new MaterialPropertyBlock();
             SetInk(inkColor);
+        }
+
+        protected override void OnEnable()
+        {
+            base.OnEnable();
+            _undo = new InputAction("Undo stroke", InputActionType.Button);
+            _undo.AddBinding("<XRController>{LeftHand}/primaryButton");
+            _undo.AddBinding("<XRController>{RightHand}/primaryButton");
+            _undo.AddBinding("<Keyboard>/z");
+            _undo.Enable();
+        }
+
+        protected override void OnDisable()
+        {
+            base.OnDisable();
+            _undo?.Dispose();
+            _undo = null;
         }
 
         protected override void OnReleased() => _stroke?.End();
@@ -123,6 +143,7 @@ namespace Maliang.Drawing
                 _strokeCanvas = target;
             }
             if (_stroke == null || nib == null) return;
+            if (_undo != null && _undo.WasPressedThisFrame()) Undo(target);
             // Nib speed along the paper, for the grain.
             Vector3 moved = Vector3.ProjectOnPlane(nib.position - _lastNibPos, target.transform.up);
             float speed = moved.magnitude / Mathf.Max(Time.deltaTime, 1e-4f);
@@ -162,6 +183,22 @@ namespace Maliang.Drawing
             {
                 _stroke.End();
                 _touching = false;
+            }
+        }
+
+        /// <summary>Takes the last stroke back: a soft brush sound and a light tick; a dull tick when there is nothing to undo.</summary>
+        void Undo(InkCanvas target)
+        {
+            _stroke.End();
+            _touching = false;
+            if (target.Undo())
+            {
+                Sfx.Play(SfxId.BrushTouch, target.transform.position, 0.45f, 0.15f);
+                Buzz(0.25f, 0.04f);
+            }
+            else if (!target.InputLocked)
+            {
+                Buzz(0.08f, 0.02f);
             }
         }
 

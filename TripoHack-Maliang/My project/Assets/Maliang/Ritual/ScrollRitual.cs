@@ -102,6 +102,8 @@ namespace Maliang.Ritual
         /// <summary>Held by the player while hovering: the bobbing pauses and it hovers where it is let go.</summary>
         public bool IsHeld { get; private set; }
 
+        /// <summary>The unrolling animation is about to start (the paper begins to open).</summary>
+        public event Action Unrolling;
         public event Action Unrolled;
         public event Action<SealType> Sealed;
         public event Action Hovering;
@@ -227,6 +229,7 @@ namespace Maliang.Ritual
         {
             if (unroll.Progress > 0f) yield return unroll.Play(0f);
             if (delay > 0f) yield return new WaitForSeconds(delay);
+            Unrolling?.Invoke();
             yield return unroll.Play(1f);
             _unrolling = null;
             State = ScrollState.Unrolled;
