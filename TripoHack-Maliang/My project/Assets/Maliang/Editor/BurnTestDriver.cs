@@ -19,7 +19,7 @@ namespace Maliang.EditorTools
     public static class BurnTestDriver
     {
         static readonly float[] Shots = { 0.05f, 0.2f, 0.4f, 0.6f, 0.8f, 0.95f };
-        static readonly float[] FailShots = { 0.4f, 1.0f, 1.7f, 2.6f, 5f, 14.4f };
+        static readonly float[] FailShots = { 0.4f, 1.0f, 1.7f, 2.4f, 3.1f, 4.4f };
         static readonly Vector2 TouchUv = new Vector2(0.62f, 0.3f);
 
         enum Step { LayDown, WaitUnrolled, WaitHover, Touch, Burning, Reveal, Done }

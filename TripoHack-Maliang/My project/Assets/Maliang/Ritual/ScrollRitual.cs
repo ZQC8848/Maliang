@@ -74,8 +74,9 @@ namespace Maliang.Ritual
         public float bobPeriod = 3.2f;
 
         [Header("Failure (Phase3Design 7.2)")]
-        [Tooltip("Seconds the failed remnant lies about (can be picked up and thrown) before it crumbles to ash.")]
-        public float remnantLifetime = 12f;
+        [Tooltip("Seconds the failed remnant lies about after landing before it crumbles to ash (the failure line stays " +
+                 "readable on its own timer).")]
+        public float remnantLifetime = 1f;
 
         [Header("Hover clearance")]
         [Tooltip("Before rising, the hover spot is checked for objects and other hovering scrolls. If it is taken the " +

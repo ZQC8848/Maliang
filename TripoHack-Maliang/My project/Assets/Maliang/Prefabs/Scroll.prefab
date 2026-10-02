@@ -560,7 +560,7 @@ MonoBehaviour:
   hoverTiltBack: 12
   bobAmplitude: 0.012
   bobPeriod: 3.2
-  remnantLifetime: 12
+  remnantLifetime: 1
   clearanceStep: 0.05
   maxLiftUp: 0.6
   maxShiftSide: 0.9
