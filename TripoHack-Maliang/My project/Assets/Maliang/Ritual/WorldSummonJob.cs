@@ -19,6 +19,7 @@ namespace Maliang.Ritual
     /// The real 「境」 summoning (Phase 6): at the seal the layers go to the library's pending folder and the drawing
     /// to the <see cref="WorldAgent"/> (vision, realistic landscape, World Labs, splats). When the world is ready it is
     /// saved to the library; once the scroll has burned away it rises around the lotus throne (<see cref="WorldStage"/>).
+    /// If the APIs fail (network, quota, a collapsed generation), the closest bundled world rises instead.
     /// </summary>
     public class WorldSummonJob : IBurnJob, IBurnOutcome
     {
@@ -27,9 +28,12 @@ namespace Maliang.Ritual
         PendingWork _work;
         FailReason? _failure;
         bool _done;
+        bool _fallingBack;
 
         public WorldJob Agent { get; private set; }
         public LibraryEntry Entry { get; private set; }
+        /// <summary>The bundled world raised instead, when the APIs failed.</summary>
+        public LibraryEntry Fallback { get; private set; }
 
         public WorldSummonJob(ScrollRitual ritual)
         {
@@ -37,11 +41,14 @@ namespace Maliang.Ritual
             _ = RunAsync();
         }
 
-        public JobVerdict Verdict => _failure != null && (Agent == null || Agent.Verdict == JobVerdict.Pending)
-            ? JobVerdict.Fail
+        public JobVerdict Verdict => _fallingBack || AgentFallsBack ? JobVerdict.Ok
+            : _failure != null && (Agent == null || Agent.Verdict == JobVerdict.Pending) ? JobVerdict.Fail
             : Agent?.Verdict ?? JobVerdict.Pending;
 
-        public FailReason? Reason => _failure ?? Agent?.Reason;
+        public FailReason? Reason => _failure ?? (_fallingBack || AgentFallsBack ? null : Agent?.Reason);
+
+        bool AgentFallsBack => Agent != null && Agent.Done && !Agent.Succeeded
+                               && FallbackMatcher.Covers(Agent.Reason) && FallbackMatcher.Available(SealType.World);
         public float Progress => Agent == null ? 0f : Mathf.Min(Agent.Progress, 0.97f);
         public bool Done => _done;
         public bool Succeeded => _done && _failure == null;
@@ -68,7 +75,12 @@ namespace Maliang.Ritual
                 Agent = new WorldAgent(MaliangConfig.Current).Start(export.Png, _work.AgentDir, _cancel.Token);
                 MaliangLog.Info("Summon", $"World agent started ({_work.Id})");
                 while (!Agent.Done) await Task.Yield();
-                if (!Agent.Succeeded) { Finish(Agent.Reason ?? FailReason.Collapsed); return; }
+                if (!Agent.Succeeded)
+                {
+                    if (AgentFallsBack) FallBack(Agent.Plan?.Ok == true ? Agent.Plan.Subject : null);
+                    else Finish(Agent.Reason ?? FailReason.Collapsed);
+                    return;
+                }
 
                 Entry = _work.Commit(Agent);
                 _work.DiscardScratch();
@@ -80,6 +92,15 @@ namespace Maliang.Ritual
                 MaliangLog.Error("Summon", e);
                 Finish(FailReason.Collapsed);
             }
+        }
+
+        void FallBack(string subject)
+        {
+            _fallingBack = true;
+            MaliangLog.Info("Summon", $"World agent failed ({Agent.Reason}); falling back to a bundled world");
+            _work.Discard();
+            Fallback = FallbackMatcher.Match(SealType.World, subject);
+            Finish(Fallback != null ? (FailReason?)null : Agent.Reason ?? FailReason.Collapsed);
         }
 
         void Finish(FailReason? failure)
@@ -94,13 +115,8 @@ namespace Maliang.Ritual
         }
 
         /// <summary>The scroll has burned away: the world rises around the throne.</summary>
-        public void Apply(ScrollRitual ritual)
-        {
-            if (Entry == null) return;
-            WorldStage.Instance.Show(Entry.PathOf(Entry.files.world), Entry.world?.metricScale, Entry.world?.groundOffset, Entry.subject,
-                Entry.PathOf(Entry.files.ambience));
-        }
+        public void Apply(ScrollRitual ritual) => WorldStage.Instance.Show(Entry ?? Fallback);
 
-        public override string ToString() => "summoning (world agent)";
+        public override string ToString() => Fallback != null ? $"summoning (fell back to \"{Fallback.subject}\")" : "summoning (world agent)";
     }
 }

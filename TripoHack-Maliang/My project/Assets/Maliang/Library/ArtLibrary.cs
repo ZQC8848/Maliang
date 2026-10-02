@@ -14,6 +14,10 @@ namespace Maliang.Library
     /// persistentDataPath/Library/&lt;id&gt;/ (drawing and seal layers, model and clips, sound, manifest) so it can be
     /// replayed from the drawer without any API. A work is written into _pending/ first and renamed into place in one
     /// step once complete (D21), so a crash never leaves half a work; failures are deleted.
+    ///
+    /// Bundled works (Phase 7, Phase3Design 8.8) ship read-only in StreamingAssets/Library/&lt;id&gt;/ in the same
+    /// format: they fill the drawers after the player's own works, so the first start already has scrolls to burn,
+    /// and they are what the fallback summons when the APIs cannot (<see cref="FallbackMatcher"/>).
     /// </summary>
     public static class ArtLibrary
     {
@@ -22,6 +26,7 @@ namespace Maliang.Library
         const string Work = "_work";
 
         public static string Root => Path.Combine(Application.persistentDataPath, "Library");
+        public static string BundledRoot => Path.Combine(Application.streamingAssetsPath, "Library");
         static string IndexPath => Path.Combine(Root, "index.json");
 
         /// <summary>A new work has been committed (the drawer adds its scroll).</summary>
@@ -127,7 +132,7 @@ namespace Maliang.Library
         /// <summary>Gives a saved 「境」 work its ambience loop (works saved before ambience existed).</summary>
         public static void AddAmbience(LibraryEntry entry, byte[] mp3)
         {
-            if (entry?.Dir == null || mp3 == null) return;
+            if (entry?.Dir == null || entry.Bundled || mp3 == null) return;
             File.WriteAllBytes(Path.Combine(entry.Dir, "ambience.mp3"), mp3);
             entry.files.ambience = "ambience.mp3";
             WriteEntry(entry.Dir, entry);
@@ -137,7 +142,7 @@ namespace Maliang.Library
         /// <summary>A sound that arrived after the work was saved: added to it (Phase3Design 8.3).</summary>
         public static void AddSound(LibraryEntry entry, string soundPath)
         {
-            if (entry?.Dir == null || entry.files.sound != null || !File.Exists(soundPath)) return;
+            if (entry?.Dir == null || entry.Bundled || entry.files.sound != null || !File.Exists(soundPath)) return;
             File.Copy(soundPath, Path.Combine(entry.Dir, "sound.mp3"), true);
             entry.files.sound = "sound.mp3";
             WriteEntry(entry.Dir, entry);
@@ -218,26 +223,57 @@ namespace Maliang.Library
         // ------------------------------------------------------------------ reading
 
         /// <summary>
-        /// Works stamped with <paramref name="seal"/>, newest first, that are complete on disk. Incomplete ones are left
-        /// out with a warning (they stay on disk).
+        /// Works stamped with <paramref name="seal"/> that are complete on disk: the player's own, newest first, then
+        /// the bundled ones. Incomplete works are left out with a warning (they stay on disk).
         /// </summary>
         public static List<LibraryEntry> List(SealType seal, int max = int.MaxValue)
         {
             var result = new List<LibraryEntry>();
+            var copied = new HashSet<string>(Bundled(seal).Select(b => b.bundledFrom).Where(s => s != null));
             foreach (var item in ReadIndex().Where(i => i.seal == seal.ToString()).OrderByDescending(i => i.createdAt))
             {
                 if (result.Count >= max) break;
+                if (copied.Contains(item.id)) continue; // shipped as a bundled work: that copy is shown
                 var e = ReadEntry(Path.Combine(Root, item.id));
-                if (e == null) continue;
-                var missing = e.MissingFiles();
-                if (missing.Count > 0)
-                {
-                    MaliangLog.Warn("Library", $"{e.id} is incomplete (missing {string.Join(", ", missing)}); not shown");
-                    continue;
-                }
-                result.Add(e);
+                if (e != null && Complete(e)) result.Add(e);
+            }
+            foreach (var e in Bundled(seal))
+            {
+                if (result.Count >= max) break;
+                if (result.All(r => r.id != e.id)) result.Add(e);
             }
             return result;
+        }
+
+        static List<LibraryEntry> _bundled;
+
+        /// <summary>The bundled works stamped with <paramref name="seal"/> (read once), in their folders' order.</summary>
+        public static List<LibraryEntry> Bundled(SealType seal)
+        {
+            if (_bundled == null)
+            {
+                _bundled = new List<LibraryEntry>();
+                if (Directory.Exists(BundledRoot))
+                {
+                    foreach (var dir in Directory.GetDirectories(BundledRoot).OrderBy(d => d, StringComparer.Ordinal))
+                    {
+                        var e = ReadEntry(dir);
+                        if (e == null || !Complete(e)) continue;
+                        e.Bundled = true;
+                        _bundled.Add(e);
+                    }
+                }
+                MaliangLog.Info("Library", $"{_bundled.Count} bundled works ({BundledRoot})");
+            }
+            return _bundled.Where(e => e.seal == seal.ToString()).ToList();
+        }
+
+        static bool Complete(LibraryEntry e)
+        {
+            var missing = e.MissingFiles();
+            if (missing.Count == 0) return true;
+            MaliangLog.Warn("Library", $"{e.id} is incomplete (missing {string.Join(", ", missing)}); not shown");
+            return false;
         }
 
         static LibraryEntry ReadEntry(string dir)
@@ -329,12 +365,18 @@ namespace Maliang.Library
         public string seal;
         public string subject;
         public string category;
+        /// <summary>Words the fallback matches a drawing's subject against (bundled works).</summary>
+        public string[] keywords;
+        /// <summary>A bundled work's original in the developer's library (shown as the bundled copy instead).</summary>
+        public string bundledFrom;
         public LibraryFiles files = new LibraryFiles();
         [JsonProperty("object")] public LibraryObject @object;
         public LibraryWorld world;
 
         /// <summary>The work's folder (not saved).</summary>
         [JsonIgnore] public string Dir;
+        /// <summary>Shipped with the game (StreamingAssets, read-only), not made by the player.</summary>
+        [JsonIgnore] public bool Bundled;
 
         public string PathOf(string file) => string.IsNullOrEmpty(file) ? null : System.IO.Path.Combine(Dir, file);
 

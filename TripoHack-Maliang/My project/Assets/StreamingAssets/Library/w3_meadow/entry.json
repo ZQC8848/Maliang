@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 1,
+  "id": "w3_meadow",
+  "createdAt": "2026-10-02T00:00:19Z",
+  "seal": "World",
+  "subject": "rolling wildflower meadows with a solitary tree",
+  "category": "world",
+  "files": {
+    "ink": "ink.png",
+    "seal": "seal.png",
+    "model": null,
+    "sound": null,
+    "refined": null,
+    "plan": null,
+    "world": "world.spz",
+    "ambience": "ambience.mp3",
+    "clips": []
+  },
+  "object": null,
+  "world": {
+    "splatSize": "full_res",
+    "metricScale": 2.7188725,
+    "groundOffset": 1.5702786,
+    "worldId": "4aa6b00e-c033-42f8-95d1-17835ffc26f4",
+    "marbleUrl": "https://marble.worldlabs.ai/world/4aa6b00e-c033-42f8-95d1-17835ffc26f4",
+    "caption": "The scene is a panoramic, realistic depiction of a sprawling meadow under a vast, lightly clouded sky, exuding a peaceful and spacious atmosphere characteristic of a late-spring day. The gentle meadow slopes extend continuously around, creating an immersive natural environment. In the center, two rounded green hills, covered in a vibrant array of purple and orange wildflowers, dominate the immediate landscape. A solitary tree with distinctive warm orange-toned bark and a full, rounded canopy stands prominently on the crest of the rightmost hill. The hills seamlessly merge into the distance, where additional soft, undulating meadow slopes recede towards a distant horizon. Patches of wildflowers, mirroring those on the hillsides, dot the foreground and continue around the entire expanse of the meadow. The sky above is a clear blue, adorned with scattered, fluffy white clouds, indicating fair weather and soft daylight. The environment is devoid of any man-made structures, reinforcing the untouched natural beauty. A mild breeze subtly sways the wildflowers and grass, adding to the tranquil ambiance of the scene. The 360 scene is faultless.",
+    "model": "marble-1.1"
+  },
+  "bundledFrom": "2026-10-01T16-58-54_a00f",
+  "keywords": [
+    "meadow",
+    "field",
+    "grass",
+    "flower",
+    "tree",
+    "hill",
+    "garden",
+    "countryside",
+    "spring",
+    "prairie"
+  ]
+}

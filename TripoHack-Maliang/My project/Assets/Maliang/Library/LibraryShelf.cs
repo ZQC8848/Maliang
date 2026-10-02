@@ -158,8 +158,7 @@ namespace Maliang.Library
             {
                 job = new ReplayJob(_ => System.Threading.Tasks.Task.FromResult(work.MissingFiles().Count == 0))
                 {
-                    OnBurnedAway = _ => WorldStage.Instance.Show(work.PathOf(work.files.world), work.world?.metricScale,
-                        work.world?.groundOffset, work.subject, work.PathOf(work.files.ambience)),
+                    OnBurnedAway = _ => WorldStage.Instance.Show(work),
                 };
                 return job;
             }

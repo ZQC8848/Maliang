@@ -21,6 +21,8 @@ namespace Maliang.Ritual
     /// library, exports the drawing and starts the <see cref="ObjectAgent"/>. Once the model is ready it saves the work
     /// to the library (waiting a few seconds for the sound, which is added later if it is slower) and builds the object
     /// hidden; only then is the job done, so the burn ends the moment the object can appear.
+    /// If the APIs fail (network, quota, a collapsed generation; not a drawing the agent rejects), a bundled work
+    /// matched to what the agent read comes instead (<see cref="FallbackMatcher"/>) and the burn never shows a failure.
     /// </summary>
     public class SummonJob : IBurnJob, IPreparedSummon
     {
@@ -32,10 +34,13 @@ namespace Maliang.Ritual
         FailReason? _failure;
         bool _done;
         float _finishing; // progress of the last steps (save, load), so the fire keeps moving
+        bool _fallingBack;
 
         public ObjectJob Agent { get; private set; }
         public LibraryEntry Entry { get; private set; }
         public SummonedObject Prepared { get; private set; }
+        /// <summary>The bundled work summoned instead, when the APIs failed.</summary>
+        public LibraryEntry Fallback { get; private set; }
 
         public SummonJob(ScrollRitual ritual)
         {
@@ -43,11 +48,15 @@ namespace Maliang.Ritual
             _ = RunAsync();
         }
 
-        public JobVerdict Verdict => _failure != null && (Agent == null || Agent.Verdict == JobVerdict.Pending)
-            ? JobVerdict.Fail
+        public JobVerdict Verdict => _fallingBack || AgentFallsBack ? JobVerdict.Ok
+            : _failure != null && (Agent == null || Agent.Verdict == JobVerdict.Pending) ? JobVerdict.Fail
             : Agent?.Verdict ?? JobVerdict.Pending;
 
-        public FailReason? Reason => _failure ?? Agent?.Reason;
+        public FailReason? Reason => _failure ?? (_fallingBack || AgentFallsBack ? null : Agent?.Reason);
+
+        /// <summary>The agent has failed in a way the fallback covers (true from that frame on, before it starts).</summary>
+        bool AgentFallsBack => Agent != null && Agent.Done && !Agent.Succeeded
+                               && FallbackMatcher.Covers(Agent.Reason) && FallbackMatcher.Available(SealType.Object);
         public float Progress => Agent == null ? 0f : Mathf.Min(Agent.Progress, 0.95f) + 0.05f * _finishing;
         public bool Done => _done;
         public bool Succeeded => _done && _failure == null;
@@ -76,7 +85,8 @@ namespace Maliang.Ritual
                 while (!Agent.Done) await Task.Yield();
                 if (!Agent.Succeeded)
                 {
-                    Finish(Agent.Reason ?? FailReason.Collapsed);
+                    if (AgentFallsBack) await FallBackAsync(Agent.Plan?.Ok == true ? Agent.Plan : null);
+                    else Finish(Agent.Reason ?? FailReason.Collapsed);
                     return;
                 }
 
@@ -107,6 +117,21 @@ namespace Maliang.Ritual
                 MaliangLog.Error("Summon", e);
                 Finish(FailReason.Collapsed);
             }
+        }
+
+        /// <summary>A bundled work instead of the failed generation; the player's drawing is not kept (nothing was made of it).</summary>
+        async Task FallBackAsync(VisionPlan plan)
+        {
+            _fallingBack = true;
+            MaliangLog.Info("Summon", $"Agent failed ({Agent.Reason}); falling back to a bundled work");
+            _work.Discard();
+            var entry = FallbackMatcher.Match(SealType.Object, plan?.Subject, plan?.Category);
+            _finishing = 0.3f;
+            Prepared = entry != null ? await Summoning.PrepareAsync(ObjectSpawner.Request.From(entry), _cancel.Token) : null;
+            if (Prepared == null) { Finish(Agent.Reason ?? FailReason.Collapsed); return; }
+            Fallback = entry;
+            _finishing = 1f;
+            Finish(null);
         }
 
         void Finish(FailReason? failure)
@@ -147,6 +172,6 @@ namespace Maliang.Ritual
             return tcs.Task;
         }
 
-        public override string ToString() => "summoning (agent)";
+        public override string ToString() => Fallback != null ? $"summoning (fell back to \"{Fallback.subject}\")" : "summoning (agent)";
     }
 }

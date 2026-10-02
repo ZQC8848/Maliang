@@ -1,0 +1,18 @@
+[
+  { "id": "o1_lantern", "source": "2026-10-01T14-02-15_d469",
+    "keywords": ["lantern", "lamp", "light", "candle", "festival", "paper", "glow"] },
+  { "id": "o2_koi", "source": "2026-10-01T14-10-23_58e0",
+    "keywords": ["koi", "carp", "fish", "pond", "water", "swim"] },
+  { "id": "o3_cat", "source": "2026-10-01T14-25-04_07a5",
+    "keywords": ["cat", "kitten", "kitty", "pet", "feline", "animal", "tiger"] },
+  { "id": "o4_watermelon", "source": "2026-10-01T14-45-16_ce5e",
+    "keywords": ["watermelon", "melon", "fruit", "food", "ball", "round"] },
+  { "id": "o5_goldfish", "source": "2026-10-01T17-00-04_bb23",
+    "keywords": ["goldfish", "fish", "carp", "water", "swim", "aquarium"] },
+  { "id": "w1_lake", "source": "2026-10-01T15-28-33_8c6b", "world": "bundled_lake_170650",
+    "keywords": ["lake", "boat", "river", "water", "fishing", "shore", "sea", "pond", "ship", "fisherman"] },
+  { "id": "w2_mountain", "source": "2026-10-01T16-08-23_5499", "world": "bundled_mountain_170650",
+    "keywords": ["mountain", "peak", "valley", "hill", "rock", "cliff", "summit", "range", "alpine"] },
+  { "id": "w3_meadow", "source": "2026-10-01T16-58-54_a00f", "world": "bundled_meadow_170650",
+    "keywords": ["meadow", "field", "grass", "flower", "tree", "hill", "garden", "countryside", "spring", "prairie"] }
+]

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "o4_watermelon",
+  "createdAt": "2026-10-01T21:48:14Z",
+  "seal": "Object",
+  "subject": "a whole watermelon",
+  "category": "object",
+  "files": {
+    "ink": "ink.png",
+    "seal": "seal.png",
+    "model": "model.glb",
+    "sound": null,
+    "refined": null,
+    "plan": null,
+    "clips": []
+  },
+  "object": {
+    "animated": false,
+    "animations": [],
+    "sizeM": 0.35,
+    "sound": null
+  },
+  "world": null,
+  "bundledFrom": "2026-10-01T14-45-16_ce5e",
+  "keywords": [
+    "watermelon",
+    "melon",
+    "fruit",
+    "food",
+    "ball",
+    "round"
+  ]
+}

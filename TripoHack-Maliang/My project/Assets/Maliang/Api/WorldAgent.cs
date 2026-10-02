@@ -69,6 +69,14 @@ namespace Maliang.Api
             Directory.CreateDirectory(workDir);
             File.WriteAllBytes(Path.Combine(workDir, "ink.png"), inkPng);
             var job = new WorldJob { Id = Path.GetFileName(workDir.TrimEnd('/', '\\')), WorkDir = workDir, Model = _worlds.Model };
+            int cap = _config.limits.maxGenerationsPerSession;
+            if (cap > 0 && ObjectAgent.SessionCount >= cap)
+            {
+                MaliangLog.Warn("World", $"Session limit reached ({cap} generations)");
+                _ = FailLaterAsync(job, FailReason.Exhausted);
+                return job;
+            }
+            ObjectAgent.SessionCount++;
             _ = RunAsync(job, inkPng, cancel);
             return job;
         }
@@ -170,6 +178,12 @@ namespace Maliang.Api
                 DurationS = AmbienceSeconds,
                 Prompt = prompt.TrimEnd('.') + ". Calm continuous ambience, seamless loop, no music, no voices.",
             }, cancel);
+
+        static async Task FailLaterAsync(WorldJob job, FailReason reason)
+        {
+            await Task.Yield();
+            Fail(job, reason);
+        }
 
         static void Set(WorldJob job, string stage, float progress)
         {

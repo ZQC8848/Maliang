@@ -7,7 +7,8 @@ namespace Maliang.Ritual
 {
     /// <summary>
     /// Development shortcuts for the desk: keyboard (editor / desktop) and the left controller's menu button.
-    /// R or left menu: reset the scroll.   E: export the ink to TestData/Exports/ as PNG.
+    /// R or left menu: reset the scroll (always). The rest only in the editor and development builds:
+    /// E: export the ink to TestData/Exports/ as PNG.
     /// B: set the hovering scroll alight without the candle.   I: log the state of every scroll.
     /// 0: switch between the real agent and fake summoning (no API).
     /// Fake summoning (the fake job a sealed scroll waits on; also applied to the scroll in progress):
@@ -57,6 +58,7 @@ namespace Maliang.Ritual
                 if (station != null) station.ResetAll();
                 else ritual.ResetScroll();
             }
+            if (!Debug.isDebugBuild) return; // a release build (the judges') has only the reset
             if (Keyboard.current != null && Keyboard.current.eKey.wasPressedThisFrame) ExportToTestData();
             if (Keyboard.current != null && Keyboard.current.bKey.wasPressedThisFrame) IgniteHovering();
             if (Keyboard.current != null && Keyboard.current.iKey.wasPressedThisFrame) LogScrolls();

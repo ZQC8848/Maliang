@@ -1,6 +1,7 @@
 """Phase 6 spike: one drawing through the 「境」 pipeline outside Unity.
 
   python Tools/agent/world_spike.py <ink.png> [--model marble-1.0-draft] [--prompt "refine prompt"] [--text "world text"]
+                                    [--refined <already refined.png>] [--name <output folder name>]
 
 1. Refine the ink drawing into a realistic landscape image (gpt-image, 1536x1024).
 2. World Labs: prepare_upload -> PUT the image -> worlds:generate -> poll the operation -> world.
@@ -111,12 +112,16 @@ def main(args):
     model = args[args.index("--model") + 1] if "--model" in args else "marble-1.0-draft"
     prompt = args[args.index("--prompt") + 1] if "--prompt" in args else DEFAULT_REFINE
     text = args[args.index("--text") + 1] if "--text" in args else None
-    name = os.path.splitext(os.path.basename(ink))[0]
+    given = args[args.index("--refined") + 1] if "--refined" in args else None
+    name = args[args.index("--name") + 1] if "--name" in args else os.path.splitext(os.path.basename(ink))[0]
     out = os.path.join(PROJECT, "TestData", "World", f"{name}_{time.strftime('%H%M%S')}")
     os.makedirs(out, exist_ok=True)
     t0 = time.time()
     refined = os.path.join(out, "refined.png")
-    refine(ink, refined, prompt)
+    if given:  # reuse a reference image (e.g. a library work's), no refine call
+        open(refined, "wb").write(open(given, "rb").read())
+    else:
+        refine(ink, refined, prompt)
     world = poll(generate(upload(refined), model, text), out)
     if world is None:
         return

@@ -557,6 +557,7 @@ namespace Maliang.Ritual
             if (Job is ReplayJob replay) replay.Cancel();
             if (Job is SummonJob summoning) summoning.Cancel();
             if (Job is WorldSummonJob world) world.Cancel();
+            if (Job is FallbackJob fallback) fallback.Cancel();
             Job = null;
             IsReplay = false;
             _revealed = false;

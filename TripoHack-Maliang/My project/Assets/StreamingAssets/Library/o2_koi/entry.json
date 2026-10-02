@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "id": "o2_koi",
+  "createdAt": "2026-10-01T21:13:04Z",
+  "seal": "Object",
+  "subject": "a tricolour koi fish",
+  "category": "aquatic",
+  "files": {
+    "ink": "ink.png",
+    "seal": "seal.png",
+    "model": "model.glb",
+    "sound": null,
+    "refined": null,
+    "plan": null,
+    "clips": []
+  },
+  "object": {
+    "animated": true,
+    "animations": [
+      "preset:aquatic:march"
+    ],
+    "sizeM": 0.45,
+    "sound": null
+  },
+  "world": null,
+  "bundledFrom": "2026-10-01T14-10-23_58e0",
+  "keywords": [
+    "koi",
+    "carp",
+    "fish",
+    "pond",
+    "water",
+    "swim"
+  ]
+}

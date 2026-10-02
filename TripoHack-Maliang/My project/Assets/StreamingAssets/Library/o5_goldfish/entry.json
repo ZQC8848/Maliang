@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "id": "o5_goldfish",
+  "createdAt": "2026-10-02T00:02:05Z",
+  "seal": "Object",
+  "subject": "an orange and golden-yellow fish",
+  "category": "aquatic",
+  "files": {
+    "ink": "ink.png",
+    "seal": "seal.png",
+    "model": "model.glb",
+    "sound": null,
+    "refined": null,
+    "plan": null,
+    "world": null,
+    "ambience": null,
+    "clips": []
+  },
+  "object": {
+    "animated": true,
+    "animations": [
+      "preset:aquatic:march"
+    ],
+    "sizeM": 0.4,
+    "sound": null
+  },
+  "world": null,
+  "bundledFrom": "2026-10-01T17-00-04_bb23",
+  "keywords": [
+    "goldfish",
+    "fish",
+    "carp",
+    "water",
+    "swim",
+    "aquarium"
+  ]
+}

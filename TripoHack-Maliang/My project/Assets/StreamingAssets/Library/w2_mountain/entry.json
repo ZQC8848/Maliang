@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "id": "w2_mountain",
+  "createdAt": "2026-10-01T23:09:45Z",
+  "seal": "World",
+  "subject": "a solitary mountain above an open rocky valley",
+  "category": "world",
+  "files": {
+    "ink": "ink.png",
+    "seal": "seal.png",
+    "model": null,
+    "sound": null,
+    "refined": null,
+    "plan": null,
+    "world": "world.spz",
+    "ambience": "ambience.mp3",
+    "clips": []
+  },
+  "object": null,
+  "world": {
+    "splatSize": "full_res",
+    "metricScale": 1.6236005,
+    "groundOffset": 0.9303223,
+    "worldId": "d2872f66-f7ab-40a2-8761-7871fed61733",
+    "marbleUrl": "https://marble.worldlabs.ai/world/d2872f66-f7ab-40a2-8761-7871fed61733",
+    "caption": "The scene is a panoramic alpine landscape, rendered in a realistic style, conveying a quiet and spacious mood under a pale sky. The overall tone is one of serene wilderness, with cool air and a light breeze. Ahead, a dark central mountain rises prominently from the valley floor, its long slope extending to the left and culminating in a shorter, jagged ridge on the right. Subdued gray-green slopes continue into the surrounding distance, forming a vast, open environment. The valley floor is composed of gently sloping gravel, sparsely covered with alpine groundcover. To the left, the gentle gravel slopes rise gradually, leading to low rocky foothills that extend into the expansive landscape. The ground beneath is dry, indicative of a summer season, with scattered patches of tough, low-lying vegetation interspersed among the rocks and gravel. To the right, the terrain also rises to meet more rocky foothills, maintaining the consistent dry, gravelly texture throughout the entire area. The pale sky stretches overhead, casting soft, even daylight across the entire scene without any harsh shadows. The 360 scene is faultless.",
+    "model": "marble-1.1"
+  },
+  "bundledFrom": "2026-10-01T16-08-23_5499",
+  "keywords": [
+    "mountain",
+    "peak",
+    "valley",
+    "hill",
+    "rock",
+    "cliff",
+    "summit",
+    "range",
+    "alpine"
+  ]
+}

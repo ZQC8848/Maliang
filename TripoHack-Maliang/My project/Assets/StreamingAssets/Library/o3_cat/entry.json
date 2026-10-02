@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "id": "o3_cat",
+  "createdAt": "2026-10-01T21:27:12Z",
+  "seal": "Object",
+  "subject": "an orange cat",
+  "category": "quadruped",
+  "files": {
+    "ink": "ink.png",
+    "seal": "seal.png",
+    "model": "model.glb",
+    "sound": "sound.mp3",
+    "refined": null,
+    "plan": null,
+    "clips": []
+  },
+  "object": {
+    "animated": true,
+    "animations": [
+      "preset:quadruped:walk"
+    ],
+    "sizeM": 0.45,
+    "sound": {
+      "kind": "oneshot",
+      "trigger": "on_grab"
+    }
+  },
+  "world": null,
+  "bundledFrom": "2026-10-01T14-25-04_07a5",
+  "keywords": [
+    "cat",
+    "kitten",
+    "kitty",
+    "pet",
+    "feline",
+    "animal",
+    "tiger"
+  ]
+}

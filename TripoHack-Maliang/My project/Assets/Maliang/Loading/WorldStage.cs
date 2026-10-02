@@ -75,6 +75,14 @@ namespace Maliang.Loading
             _transition = StartCoroutine(ShowRoutine(spzPath, metricScale, groundOffset, name, ambiencePath));
         }
 
+        /// <summary>Raises a library work's world (with its scale, ground and ambience); null does nothing.</summary>
+        public void Show(Library.LibraryEntry work)
+        {
+            if (work == null) return;
+            Show(work.PathOf(work.files.world), work.world?.metricScale, work.world?.groundOffset, work.subject,
+                work.PathOf(work.files.ambience));
+        }
+
         /// <summary>Lets the current world fade away, back to the sky.</summary>
         public void Clear()
         {

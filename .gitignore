@@ -3,6 +3,9 @@
 [Ll]ibrary/
 # ...but not the game's own code folder that happens to be called Library (the artwork library)
 !TripoHack-Maliang/My project/Assets/Maliang/Library/
+# ...nor the bundled works shipped in StreamingAssets, nor the tool that makes them
+!TripoHack-Maliang/My project/Assets/StreamingAssets/Library/
+!Tools/library/
 [Tt]emp/
 [Oo]bj/
 [Bb]uild/

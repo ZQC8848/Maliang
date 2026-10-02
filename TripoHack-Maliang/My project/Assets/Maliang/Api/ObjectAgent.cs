@@ -73,8 +73,8 @@ namespace Maliang.Api
 
         public ObjectCapabilities Capabilities => _vision.Capabilities;
 
-        /// <summary>Generations started this session (all agents); capped by limits.maxGenerationsPerSession.</summary>
-        public static int SessionCount { get; private set; }
+        /// <summary>Generations started this session (objects and worlds); capped by limits.maxGenerationsPerSession.</summary>
+        public static int SessionCount { get; internal set; }
 
         /// <summary>Starts a job for an exported ink drawing; returns at once.</summary>
         public ObjectJob Start(byte[] inkPng, string workDir, CancellationToken cancel = default)
