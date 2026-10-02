@@ -25,7 +25,7 @@ namespace Maliang.Api
 
         Dictionary<string, string> Auth => new Dictionary<string, string> { ["WLT-Api-Key"] = _config.worldLabs.apiKey };
 
-        /// <summary>The model for this run: the cheap draft while developing, the full model for the demo.</summary>
+        /// <summary>The model for this run: the fast draft (the default), or the configured model when draft is off.</summary>
         public string Model => _config.worldLabs.draft ? "marble-1.0-draft" : _config.worldLabs.model;
 
         /// <summary>Uploads a PNG; returns its media asset id.</summary>

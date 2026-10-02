@@ -7,8 +7,9 @@ namespace Maliang.Core
     [Serializable]
     public class WorldLabsConfig
     {
-        public string apiKey = ""; public string model = "marble-1.1"; public string splat = "full_res";
-        /// <summary>Develop with the cheap draft model (marble-1.0-draft, 230 credits, ~30 s); the demo turns it off (marble-1.1, 1,580 credits, ~5 min).</summary>
+        public string apiKey = ""; public string model = "marble-1.0-draft"; public string splat = "full_res";
+        /// <summary>Worlds are generated with the fast draft model (marble-1.0-draft: about 30 s, 230 credits), in
+        /// development and in the demo alike. False uses <see cref="model"/> instead (marble-1.1: about 5 min, 1,580 credits).</summary>
         public bool draft = true;
     }
     [Serializable]

@@ -2,7 +2,7 @@
   "mode": "online",
   "worldLabs": {
     "apiKey": "",
-    "model": "marble-1.1",
+    "model": "marble-1.0-draft",
     "splat": "full_res",
     "draft": true
   },
