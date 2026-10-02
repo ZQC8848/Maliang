@@ -237,12 +237,13 @@ related: "TechPlan.md, Phase3Design.md"
 
 ## 阶段 8(M7):打包与发布
 
-- [ ] 出 Windows 独立包,`maliang.config.json` 放 exe 旁
+- [x] 出 Windows 独立包(菜单 Maliang/Build:先 Collect glTF Shader Variants,再 Windows Build → `Build/Maliang/Maliang.exe`,425 MB,增量构建约 12 秒):`maliang.config.json` 放 exe 旁(构建只放无密钥模板),附 `Maliang (D3D12).bat` 和 README;产品名改为 Maliang(存档目录 LocalLow/Maliang/Maliang);`Maliang.exe -selftest` 自检通过(内置猫与湖景在 exe 中正常显示)
+- [ ] 头显实测 exe;Meta Horizon 运行时在未连头显时 Vulkan 启动会崩,D3D12 正常,确认 PICO 串流运行时下用哪个
 - [ ] 为 demo 专门开密钥;设额度与硬性花费上限;会话限额已生效
 - [ ] 确认各服务条款对随包分发密钥的规定
 - [ ] 确定分发渠道(私有链接/压缩包,避免公开页面导致密钥暴露)
 - [ ] 录屏作为最后保障
-- [ ] 写说明文档:运行要求(Vulkan/D3D12、头显)、配置方法、快速模式
+- [x] 写说明文档:构建目录 README.txt(运行要求、配置、VR 操作、自检);快速模式说明待补
 - [ ] 评审结束后立刻作废/轮换密钥
 - [ ] 在干净机器上做一次「下载即玩」验证
 
